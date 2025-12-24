@@ -14,8 +14,11 @@ myip=`curl -4 -s ifconfig.me`
 echo -n "A default laravel webite is optional. Install default webite @ http://$myip [Y/n]=>" && read dolaravelwebsite
 if [ ! "$dolaravelwebsite" == "n" ]; then
 	# make sure everything exists
-	mkdir -p /var/www/laravel
-	sudo chown $username:www-data -R laravel
+	echo "Creating a laravel project for user $username"
+	# create the full path tree
+	mkdir -p /var/www/laravel/storage/logs
+	chown $username:www-data -R laravel
+	chmod -R a+w storage
 
 	su - $username <<-'UEOF'
 	# use simple git clone for demo website
