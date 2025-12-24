@@ -24,9 +24,20 @@ logline "03.04 apt some sysop and dev tools"
 DEBIAN_FRONTEND=noninteractive apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git 
 
 logline "03.05 apt some extra tools"
+# ufw is firewall
 DEBIAN_FRONTEND=noninteractive apt install -qq -y ufw
 ## optional BIG development install
 ## yum groupinstall "Development Tools"
+
+logline "03.05 apt Sury repo"
+# Install dependencies
+apt install -y apt-transport-https lsb-release ca-certificates curl
+# Add Sury GPG key
+curl -sSLo /usr/share/keyrings/deb.sury.org-php.gpg https://packages.sury.org/php/apt.gpg
+# Add repository
+echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+# Update
+apt update
 
 logline "03.96 add gh command to git for push to github (origin)"
 git config --global alias.gh '!f() { git add -A && git commit -m "${@:-incremental}" && git push; }; f'

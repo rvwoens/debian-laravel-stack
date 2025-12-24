@@ -2,23 +2,17 @@
 
 . ${BASH_SOURCE%/*}/00_settings
 
-logline "07.00 install php$PHPVER from remi"
+logline "07.00 install php$PHPVER "
 
-logline "07.01 yum php"
+logline "07.01 apt php"
 ## yum PHP and start fpm
 
-yum -d1 -y install php$PHPVER-php-fpm php$PHPVER-php-cli php$PHPVER-php-mysqlnd
-yum -d1 -y install php$PHPVER-php-mcrypt
-yum -d1 -y install  php$PHPVER-php-pecl-imagick php$PHPVER-php-mbstring php$PHPVER-php-pecl-zip php$PHPVER-php-xml php$PHPVER-php-bcmath
+apt install -y php$PHPVER php$PHPVER-fpm php$PHPVER-cli php$PHPVER-mysql php$PHPVER-curl 
+apt install -y php$PHPVER-mbstring php$PHPVER-xml php$PHPVER-zip php$PHPVER-gd php$PHPVER-bcmath php$PHPVER-redis
+apt install -y php$PHPVER-php-pgsql php$PHPVER-imagick
 
-yum -d1 -y install  php$PHPVER-php-common php$PHPVER-php-gd
-# postgres
-yum -d1 -y install  php$PHPVER-php-pgsql
-
-
-## make php available without '74' (could do yum-config-manager --enable remi-php74;yum install php-cli.. << !!!! NOO this installs an OTHER php7.4 on /usr/bin)
-## NOO dont do this: https://stackoverflow.com/questions/48682572/centos-installed-php72-but-command-line-php-isn-not-working/48683067
-ln -s /usr/bin/php$PHPVER /usr/bin/php
+# set the version
+update-alternatives --set php /usr/bin/php$PHPVER
 
 logline "07.02 php.ini changes ( expose off, max exec time, memory limit, date.timezone, fix_pathinfo)"
 phpini=`php$PHPVER --ini | grep Loaded | grep -o -e '/etc.*'`
