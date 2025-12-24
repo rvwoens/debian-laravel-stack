@@ -8,7 +8,7 @@ if [ "$EUID" -ne  0 ];then
 fi
 . ./parts/01_user_create
 . ./parts/02_set_hostname
-. ./parts/03_repos_yums
+. ./parts/03_basic_packages
 . ./parts/04_root_password
 . ./parts/05_security
 . ./parts/06_global_settings
