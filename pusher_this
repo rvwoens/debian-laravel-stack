@@ -1,0 +1,39 @@
+LASTTAG=`git describe --abbrev=0 --tags`
+echo "Current version tag $LASTTAG press key"
+if [ -z "$1" ]; then
+	echo "Usage: pusher <override-comment> [<override-version>]"
+	echo "Use version format vX.X.XX"
+	echo "Example: pusher_this \"new centos version suppoert\" v3.4.50"
+	exit
+fi
+if [ -z $2 ]; then
+	NEWTAG=`newversion -x $LASTTAG`
+else
+	echo "Use version $1"
+	NEWTAG=$2
+fi
+# tag with "v" removed
+NEWTAGSHORT=${NEWTAG:1}
+echo ">>>> git pull origin (CI might commit stuff)"
+git pull origin
+
+echo ">>>> Creating VERSION and update README"
+echo "version=$NEWTAG\ndate=\"$(date)\"" > ./VERSION
+rmtemp=`mktemp`
+cat README.md | \
+	sed -e "s/archive\/[^t]*.tar.gz/archive\/$NEWTAG.tar.gz/" | \
+	sed -e "s/cd centos-laravel-stack-.*/cd centos-laravel-stack-$NEWTAGSHORT/" | \
+	sed -e "s/badge\/release-.*-blue/badge\/release-$NEWTAGSHORT-blue/"   >$rmtemp
+mv -f $rmtemp README.md
+
+echo ">>>> Creating new version tag $NEWTAG"
+git add --all .
+git commit -a -m "${1:-Release $NEWTAG}"
+git tag "$NEWTAG"
+echo ">>>> git push origin"
+git push origin master:master
+echo -e ">>>> git push origin --tags "
+git push origin --tags
+echo ">>>> create release based on tag"
+githubrelease "$NEWTAG"
+

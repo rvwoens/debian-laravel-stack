@@ -1,0 +1,64 @@
+#!/bin/bash
+
+. ${BASH_SOURCE%/*}/00_settings
+
+logline "07.00 install php$PHPVER from remi"
+
+logline "07.01 yum php"
+## yum PHP and start fpm
+
+yum -d1 -y install php$PHPVER-php-fpm php$PHPVER-php-cli php$PHPVER-php-mysqlnd
+yum -d1 -y install php$PHPVER-php-mcrypt
+yum -d1 -y install  php$PHPVER-php-pecl-imagick php$PHPVER-php-mbstring php$PHPVER-php-pecl-zip php$PHPVER-php-xml php$PHPVER-php-bcmath
+
+yum -d1 -y install  php$PHPVER-php-common php$PHPVER-php-gd
+# postgres
+yum -d1 -y install  php$PHPVER-php-pgsql
+
+
+## make php available without '74' (could do yum-config-manager --enable remi-php74;yum install php-cli.. << !!!! NOO this installs an OTHER php7.4 on /usr/bin)
+## NOO dont do this: https://stackoverflow.com/questions/48682572/centos-installed-php72-but-command-line-php-isn-not-working/48683067
+ln -s /usr/bin/php$PHPVER /usr/bin/php
+
+logline "07.02 php.ini changes ( expose off, max exec time, memory limit, date.timezone, fix_pathinfo)"
+phpini=`php$PHPVER --ini | grep Loaded | grep -o -e '/etc.*'`
+echo "PHP ini file at $phpini"
+phpinitemp=`mktemp`
+# make some changes to the php.ini (you might tweak this a little)
+cat $phpini |
+	sed -e "s/expose_php = On/expose_php = Off/" |
+	sed -r "s/max_execution_time = [0-9]+/max_execution_time = 360/" |
+	sed -r "s/memory_limit = [0-9]+M/memory_limit = 512M/" |
+	sed -r "s/upload_max_filesize = [0-9]+M/upload_max_filesize = 12M/" |
+	# Etc/UTC or UTC is the same
+  sed -e "s/;date.timezone =/date.timezone = UTC/" |
+	sed -r "s/;cgi.fix_pathinfo=[0-9]/cgi.fix_pathinfo=0/" 	>$phpinitemp
+mv -f $phpinitemp $phpini
+# mktemp creates a rw------- file. Nead to give right to users
+chmod a+r $phpini
+
+logline "07.03 fpm service"
+#phpfpmconf=/etc/opt/remi/php74/php-fpm.d/www.conf
+phpconfdir=`php$PHPVER --ini | grep "Configuration File" | grep "Path" | grep -o -e '/etc.*'`
+phpfpmconf=$phpconfdir/php-fpm.d/www.conf
+phpfpmconftemp=`mktemp`
+# use tcp for fastcgi and change user/group to nginx to make it equal to nginx service
+cat $phpfpmconf |
+  sed -e "s/listen =/\nlisten=127.0.0.1:9000\n;listen =/" |
+  sed -e "s/user =/\nuser = nginx\n;user =/" |
+  sed -e "s/group =/\ngroup = nginx\n;group =/" >$phpfpmconftemp
+mv -f $phpfpmconftemp $phpfpmconf
+
+## enable php fpm service
+systemctl enable php$PHPVER-php-fpm
+# not yet..
+# service php$PHPVER-php-fpm start
+
+logline "07.04 composer"
+curl -sS https://getcomposer.org/installer | php
+mv composer.phar /usr/bin/composer
+
+
+logline "07.99 php END"
+
+
