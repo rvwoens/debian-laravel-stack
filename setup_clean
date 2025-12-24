@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Centos7 server install -- CLEAN SETUP"
+echo "debian server install -- CLEAN SETUP"
 
 . ./parts/01_user_create
 . ./parts/02_set_hostname

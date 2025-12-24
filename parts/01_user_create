@@ -16,7 +16,8 @@ export username
 
 logline "01.01 add user"
 ## add the user and lock the password
-adduser --disabled-password $username && passwd -l $username
+## gecos "" means dont ask room numbers and stuff
+adduser --disabled-password --gecos "" $username && passwd -l $username
 
 logline "01.02 setup ssh, bin and some settings"
 ## set user's ssh

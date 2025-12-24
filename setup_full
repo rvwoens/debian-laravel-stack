@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "##########################################################"
-echo "Centos server install -- FULL SETUP"
+echo "debian server install -- FULL SETUP"
 echo "##########################################################"
 if [ "$EUID" -ne  0 ];then
     echo "!!!! Need to run this script as root! please login as root or do 'sudo su -' "

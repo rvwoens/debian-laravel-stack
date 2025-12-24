@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-1.0.06-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-1.0.07-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -30,8 +30,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v1.0.06.tar.gz | tar -xz
-cd debian-laravel-stack-1.0.06
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v1.0.07.tar.gz | tar -xz
+cd debian-laravel-stack-1.0.07
 ./setup_full
 ```
 
