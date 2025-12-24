@@ -30,7 +30,7 @@ mv -f $phpinitemp $phpini
 # mktemp creates a rw------- file. Nead to give right to users
 chmod a+r $phpini
 
-phpfpmini=`php-fpm -i 2>/dev/null | grep "Loaded Configuration File" | grep -o '/etc.*'`
+phpfpmini=$(echo "$phpini" | sed 's/cli/fpm/')
 echo "PHP FPM ini file at $phpfpmini"
 phpfpminitemp=`mktemp`
 # make some changes to the php.ini (you might tweak this a little)
@@ -40,7 +40,7 @@ cat $phpfpmini |
 	sed -r "s/memory_limit = [0-9]+M/memory_limit = 512M/" |
 	sed -r "s/upload_max_filesize = [0-9]+M/upload_max_filesize = 12M/" |
 	# Etc/UTC or UTC is the same
-  sed -e "s/;date.timezone =/date.timezone = UTC/"  >$phpfpminitemp
+    sed -e "s/;date.timezone =/date.timezone = UTC/"  >$phpfpminitemp
 mv -f $phpfpminitemp $phpfpmini
 # mktemp creates a rw------- file. Nead to give right to users
 chmod a+r $phpfpmini
