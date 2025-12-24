@@ -21,12 +21,14 @@ logline "03.03 update system - this can take a while.."
 DEBIAN_FRONTEND=noninteractive apt update && apt upgrade -y
 
 logline "03.04 apt some sysop and dev tools"
-DEBIAN_FRONTEND=noninteractive apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git
+DEBIAN_FRONTEND=noninteractive apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git 
 
+logline "03.05 apt some extra tools"
+DEBIAN_FRONTEND=noninteractive apt install -qq -y ufw
 ## optional BIG development install
 ## yum groupinstall "Development Tools"
 
-logline "03.05 add gh command to git for push to github (origin)"
+logline "03.96 add gh command to git for push to github (origin)"
 git config --global alias.gh '!f() { git add -A && git commit -m "${@:-incremental}" && git push; }; f'
 
 

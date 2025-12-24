@@ -26,12 +26,13 @@ cat <<-'EOF' >>$sshtemp
 	TCPKeepAlive yes
 	PasswordAuthentication no
 	# allow older ssh clients to connect (dbeaver)
-  PubkeyAcceptedKeyTypes +ssh-rsa
+    PubkeyAcceptedKeyTypes +ssh-rsa
 EOF
 mv -f $sshtemp /etc/ssh/sshd_config
 # only readable by root
 chmod 0600 /etc/ssh/sshd_config
-systemctl restart sshd.service
+# and reboot the service
+systemctl restart ssh.service
 
 
 logline "05.02 firewall"
