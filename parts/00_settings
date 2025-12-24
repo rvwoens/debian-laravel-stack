@@ -12,8 +12,8 @@ logline () {
 ## grep some info out of the os-release file
 OS_ID=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
 OS_VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
-# Use 80,81,82,83,84 etc
-PHPVER=83
+# Use 8.0,8.1,8.2,8.3,8.4 etc
+PHPVER=8.3
 #NODEVER=16.17.1
 NODEVER=24
 INSTALLPWD=`pwd`

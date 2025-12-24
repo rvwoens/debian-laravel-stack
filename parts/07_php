@@ -9,42 +9,58 @@ logline "07.01 apt php"
 
 apt install -y php$PHPVER php$PHPVER-fpm php$PHPVER-cli php$PHPVER-mysql php$PHPVER-curl 
 apt install -y php$PHPVER-mbstring php$PHPVER-xml php$PHPVER-zip php$PHPVER-gd php$PHPVER-bcmath php$PHPVER-redis
-apt install -y php$PHPVER-php-pgsql php$PHPVER-imagick
+apt install -y php$PHPVER-pgsql php$PHPVER-imagick
 
 # set the version
 update-alternatives --set php /usr/bin/php$PHPVER
 
 logline "07.02 php.ini changes ( expose off, max exec time, memory limit, date.timezone, fix_pathinfo)"
-phpini=`php$PHPVER --ini | grep Loaded | grep -o -e '/etc.*'`
-echo "PHP ini file at $phpini"
+phpini=`php --ini | grep Loaded | grep -o -e '/etc.*'`
+echo "PHP CLI ini file at $phpini"
 phpinitemp=`mktemp`
 # make some changes to the php.ini (you might tweak this a little)
 cat $phpini |
 	sed -e "s/expose_php = On/expose_php = Off/" |
-	sed -r "s/max_execution_time = [0-9]+/max_execution_time = 360/" |
+	sed -r "s/max_execution_time = [0-9]+/max_execution_time = 0/" |
 	sed -r "s/memory_limit = [0-9]+M/memory_limit = 512M/" |
 	sed -r "s/upload_max_filesize = [0-9]+M/upload_max_filesize = 12M/" |
 	# Etc/UTC or UTC is the same
-  sed -e "s/;date.timezone =/date.timezone = UTC/" |
-	sed -r "s/;cgi.fix_pathinfo=[0-9]/cgi.fix_pathinfo=0/" 	>$phpinitemp
+    sed -e "s/;date.timezone =/date.timezone = UTC/" 	>$phpinitemp
 mv -f $phpinitemp $phpini
 # mktemp creates a rw------- file. Nead to give right to users
 chmod a+r $phpini
 
+phpfpmini=`php-fpm -i 2>/dev/null | grep "Loaded Configuration File" | grep -o '/etc.*'`
+echo "PHP FPM ini file at $phpfpmini"
+phpfpminitemp=`mktemp`
+# make some changes to the php.ini (you might tweak this a little)
+cat $phpfpmini |
+	sed -e "s/expose_php = On/expose_php = Off/" |
+	sed -r "s/max_execution_time = [0-9]+/max_execution_time = 720/" |
+	sed -r "s/memory_limit = [0-9]+M/memory_limit = 512M/" |
+	sed -r "s/upload_max_filesize = [0-9]+M/upload_max_filesize = 12M/" |
+	# Etc/UTC or UTC is the same
+  sed -e "s/;date.timezone =/date.timezone = UTC/"  >$phpfpminitemp
+mv -f $phpfpminitemp $phpfpmini
+# mktemp creates a rw------- file. Nead to give right to users
+chmod a+r $phpfpmini
+
 logline "07.03 fpm service"
 #phpfpmconf=/etc/opt/remi/php74/php-fpm.d/www.conf
-phpconfdir=`php$PHPVER --ini | grep "Configuration File" | grep "Path" | grep -o -e '/etc.*'`
-phpfpmconf=$phpconfdir/php-fpm.d/www.conf
-phpfpmconftemp=`mktemp`
-# use tcp for fastcgi and change user/group to nginx to make it equal to nginx service
-cat $phpfpmconf |
-  sed -e "s/listen =/\nlisten=127.0.0.1:9000\n;listen =/" |
-  sed -e "s/user =/\nuser = nginx\n;user =/" |
-  sed -e "s/group =/\ngroup = nginx\n;group =/" >$phpfpmconftemp
-mv -f $phpfpmconftemp $phpfpmconf
+# debian already has sane defaults
+# phpconfdir=`php$PHPVER --ini | grep "Configuration File" | grep "Path" | grep -o -e '/etc.*'`
+# phpfpmconf=$phpconfdir/php-fpm.d/www.conf
+# phpfpmconftemp=`mktemp`
+# # use tcp for fastcgi and change user/group to nginx to make it equal to nginx service
+# cat $phpfpmconf |
+#   sed -e "s/listen =/\nlisten=127.0.0.1:9000\n;listen =/" |
+#   sed -e "s/user =/\nuser = nginx\n;user =/" |
+#   sed -e "s/group =/\ngroup = nginx\n;group =/" >$phpfpmconftemp
+# mv -f $phpfpmconftemp $phpfpmconf
+
 
 ## enable php fpm service
-systemctl enable php$PHPVER-php-fpm
+systemctl enable php$PHPVER-fpm
 # not yet..
 # service php$PHPVER-php-fpm start
 
