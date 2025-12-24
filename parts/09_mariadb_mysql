@@ -17,7 +17,7 @@ if [ ! "$domysql" = "n" ]; then
   logline "09.03 make mysql secure"
   echo "#################### MariaDB secure installation is going to ask some questions"
   echo "#################### The current password is still empty, just press enter when asked for"
-  /usr/bin/mysql_secure_installation
+mysql_secure_installation
 
 fi
 
