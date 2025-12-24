@@ -6,25 +6,13 @@ logline "09.00 mariadb mysql START"
 echo -n "MYSQL (MARIADB) is optional. Install mariadb [Y/n]=>" && read domysql
 if [ ! "$domysql" = "n" ]; then
 
-  logline "09.01 yum mariadb"
-  ## yum mariadb and enable
-  yum -d1 -y install mariadb-server mariadb
+  logline "09.01 apt mariadb"
+
+  apt install -y mariadb-server mariadb-client
 
   logline "09.02 enable and start"
   systemctl enable mariadb
-  service mariadb start
-
-  #### not neccesary: mysql_secure_isntallation does all this
-  #while [ -z "$mysqlpwd" ]; do
-  #	echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
-  #done
-  #mysqladmin -u root password "$mysqlpwd"
-  #mysql -u root -p$mysqlpwd <<-EOF
-  #	UPDATE mysql.user SET Password = PASSWORD('$mysqlpwd') WHERE User = 'root';
-  #
-  #	FLUSH PRIVILEGES;
-  #EOF
-  ####
+  systemctl start mariadb
 
   logline "09.03 make mysql secure"
   echo "#################### MariaDB secure installation is going to ask some questions"
