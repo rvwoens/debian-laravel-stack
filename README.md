@@ -1,5 +1,5 @@
-# simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-1.0.02-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+# Simple Debian Laravel stack for Zero-Downtime deployment
+[![GitHub Release](https://img.shields.io/badge/release-1.0.03-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Actions Status](https://github.com/rvwoens/Debian-laravel-stack/workflows/CI/badge.svg)](https://github.com/rvwoens/Debian-laravel-stack/actions)
@@ -19,7 +19,8 @@
 * Security and Hardening (fail2ban, firewall, strict sshd)
 * Add (multiple) Laravel projects (any Laravel version) with Zero-Downtime deployment
 
-The scripts are all bash, and kept very simple so you can tweak them to your needs if you want to.
+The scripts are all bash, and kept very simple so you can tweak them to your needs if you want to. 
+No stupid docker shit.
 
 Very easy project deployment by calling the project's  server ```puller``` script via a local ```pusher``` script
 Multiple servers per project support (production, staging..) through a local ```pusher.conf``` configuration
@@ -31,7 +32,7 @@ Multiple servers per project support (production, staging..) through a local ```
 
 ```bash
 yum -y install tar
-curl -s -L https://github.com/rvwoens/Debian-laravel-stack/archive/v1.0.02.tar.gz | tar -xz
+curl -s -L https://github.com/rvwoens/Debian-laravel-stack/archive/v1.0.03.tar.gz | tar -xz
 cd Debian-laravel-stack-3.1.07
 ./setup_full
 ```
