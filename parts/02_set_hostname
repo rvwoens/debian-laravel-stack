@@ -9,5 +9,7 @@ done
 
 ## lets name the host
 hostnamectl set-hostname $hostname
+## on debian we need a special entry for that in hosts. Use 127.0.1.1 not conflicting with localhost
+echo "127.0.1.1   $hostname" >> /etc/hosts
 logline "02.99 set hostname END"
 

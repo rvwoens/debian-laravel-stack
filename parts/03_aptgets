@@ -1,0 +1,33 @@
+#!/bin/bash
+
+. ${BASH_SOURCE%/*}/00_settings
+
+logline "03.00 basic packages"
+
+# logline "03.01 add repos"
+# yum -d1 -y install epel-release
+# yum -d1 -y install wget
+# if [ "$OS_VERSION" = "8" ]; then
+#     logline "03.02 Loading remi-release-8 for centos 8"
+#     dnf install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+# else
+#     logline "03.02 Loading remi-release-9 for centos 9"
+#     dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+# fi
+
+# yum -q repolist
+
+logline "03.03 update system - this can take a while.."
+DEBIAN_FRONTEND=noninteractive apt update && apt upgrade -y
+
+logline "03.04 apt some sysop and dev tools"
+DEBIAN_FRONTEND=noninteractive apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git
+
+## optional BIG development install
+## yum groupinstall "Development Tools"
+
+logline "03.05 add gh command to git for push to github (origin)"
+git config --global alias.gh '!f() { git add -A && git commit -m "${@:-incremental}" && git push; }; f'
+
+
+logline "03.99 basic packages END"
