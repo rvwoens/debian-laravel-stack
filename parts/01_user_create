@@ -35,11 +35,14 @@ su $username <<-'EOF'
 	echo ". ~/bin/z.sh" >> ~/.bashrc
 	echo "alias a=artisan" >> ~/.bashrc
 
-        # lets make a ~/crontab
-        mkdir ~/crontab
+    # lets make a ~/crontab
+    mkdir ~/crontab
 
-        ## get rid of unreadable vim colorcoding
-        echo -e "syntax off\nset t_ti= t_te= \n" >> ~/.vimrc
+    ## get rid of unreadable vim colorcoding
+    echo -e "syntax off\nset t_ti= t_te= \n" >> ~/.vimrc
+
+	# color prompt
+	echo 'export PS1="\[\e[31;1m\]\h \[\e[0;34m\]\w\[\e[39m\] \[\e[0;32m\]\u\[\e[39m\] \\$ "' >> ~/.bashrc
 EOF
 echo -e "\n$pubkey\n" >>/home/$username/.ssh/authorized_keys
 

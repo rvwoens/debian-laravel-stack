@@ -6,9 +6,6 @@ logline "06.00 global settings START"
 # flush keyboard buffer
 while read -t 1 garbage; do sleep 0; done
 
-# color prompt
-logline "06.01 color prompt"
-echo 'export PS1="\[\e[31;1m\]\h \[\e[0;34m\]\w\[\e[39m\] \[\e[0;32m\]\u\[\e[39m\] \\$ "' >> /etc/profile.d/prompt.sh
 
 ## set local timezone
 logline "06.02 set local timezone"
@@ -20,15 +17,8 @@ else
 	timedatectl set-timezone $timezone
 fi
 
-logline "06.03 Chrony server as NTP"
-dnf install -y chrony
-systemctl start chronyd
-# systemctl status chronyd
-systemctl enable chronyd
-
-logline "06.04 Python 3 - possibly already installed"
-dnf -y install python3
-dnf -y install python3-pip
+logline "06.04 Python 3 - add the stuff we need"
+apt install -y python3 python3-pip python3-dev python3-venv
 
 ### yum fortune and cowsay
 logline "06.04 install fortune and cowsay"
@@ -45,8 +35,8 @@ sh install.sh
 cd $INSTALLPWD
 echo "fortune /usr/local/share/fortunes/fortunes | cowsay -W 100 -f small" >/etc/profile.d/cowsay.sh
 
-logline "06.05 additional yum installs"
-dnf install -y rsync
+logline "06.05 additional installs"
+apt install -y rsync
 
 logline "06.99 global settings END"
  
