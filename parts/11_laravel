@@ -7,6 +7,9 @@ logline "11.00 laravel START"
 logline "11.01 create /var/www for laravel apps using Zero Downtime Deploy"
 
 mkdir -p /var/www
+chown $username:www-data /var/www
+chmod -R 775 /var/www
+
 myip=`curl -4 -s ifconfig.me`
 
 #logline "11.02 create a simple (github/laravel/laravel) site on http://$myip using addzhost?"
@@ -15,16 +18,15 @@ echo -n "A default laravel webite is optional. Install default webite @ http://$
 if [ ! "$dolaravelwebsite" == "n" ]; then
 	# make sure everything exists
 	echo "Creating a laravel project for user $username"
-	# create the full path tree
-	mkdir -p /var/www/laravel/storage/logs
-	chown $username:www-data -R laravel
-	chmod -R a+w storage
+	cd /var/www
+	rm -Rf laravel
 
 	su - $username <<-'UEOF'
 	# use simple git clone for demo website
 	cd /var/www
 	composer create-project laravel/laravel laravel --no-interaction
 	cd laravel
+	chmod -R 775 /var/www/laravel/storage /var/www/laravel/bootstrap/cache
 	composer install
 UEOF
 	# back at root
@@ -51,6 +53,7 @@ UEOF
 		DB_USERNAME=root
 		DB_PASSWORD=$mysqlpwd
 EOF
+	chown $username:www-data /var/www/laravel/.env
 	su - $username <<-'UEOF'
 	cd /var/www/laravel
 	php artisan key:generate
@@ -60,34 +63,32 @@ UEOF
 	# back at root
     chmod -R a+w storage
 	sudo cat << EOF-nginxconf >/etc/nginx/sites-available/01-laravel.conf
-	server {
-	listen   80;
-	server_name _;
-	root /var/www/laravel/public;
-	index  index.html index.htm index.php;
+		server {
+		listen   80;
+		server_name _;
+		root /var/www/laravel/public;
+		index  index.html index.htm index.php;
 
-	location / {
-			try_files \$uri \$uri/ /index.php?\$query_string;
-	}
+		location / {
+				try_files \$uri \$uri/ /index.php?\$query_string;
+		}
 
-	location ~ \.php\$ {
-		fastcgi_pass 127.0.0.1:9000;
-		fastcgi_index  index.php;
-		try_files \$uri /index.php =404;
-		fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-		# note realpathroot instead of documentroot makes symbolic link resolved by nginx and solves php realpath issues
-		fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-		fastcgi_buffers 256 128k;
-		fastcgi_connect_timeout 300s;
-		fastcgi_send_timeout 300s;
-		fastcgi_read_timeout 300s;
-		include fastcgi_params;
+		location ~ \.php\$ {
+			include snippets/fastcgi-php.conf;
+			fastcgi_pass unix:/run/php/php$PHPVER-fpm.sock;
+			fastcgi_buffers 256 128k;
+			fastcgi_connect_timeout 300s;
+			fastcgi_send_timeout 300s;
+			fastcgi_read_timeout 300s;
 		}
 	}
 EOF-nginxconf
-	sudo ln -s /etc/nginx/sites-available/01-laravel.conf /etc/nginx/sites-enabled
+	ln -s /etc/nginx/sites-available/01-laravel.conf /etc/nginx/sites-enabled
+	rm /etc/nginx/sites-enabled/default
+	rm /etc/nginx/sites-available/default
+
 	#wait for reboot
-	# sudo service nginx restart
+	service nginx restart
 	
 fi
 # back to where we came from
