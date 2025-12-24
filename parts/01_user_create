@@ -52,9 +52,8 @@ chmod u-w /etc/sudoers
 logline "01.07 copy user scripts"
 cp -R ${BASH_SOURCE%/*}/userbin/* /home/$username/bin
 
-logline "01.08 install the indispensable 'z' tool"
-# do we have wget yet?
-yum -d1 -y install wget
+logline "01.08 install the indispensable 'z' tool for root"
+
 # install https://github.com/rupa/z
 wget https://raw.githubusercontent.com/rupa/z/master/z.sh
 mv ./z.sh /home/$username/bin
