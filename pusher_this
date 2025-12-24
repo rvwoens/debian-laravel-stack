@@ -3,7 +3,7 @@ echo "Current version tag $LASTTAG press key"
 # if [ -z "$1" ]; then
 # 	echo "Usage: pusher <override-comment> [<override-version>]"
 # 	echo "Use version format vX.X.XX"
-# 	echo "Example: pusher_this \"new centos version suppoert\" v3.4.50"
+# 	echo "Example: pusher_this \"new debian version suppoert\" v3.4.50"
 # 	exit
 # fi
 if [ -z $2 ]; then
@@ -22,7 +22,7 @@ echo "version=$NEWTAG\ndate=\"$(date)\"" > ./VERSION
 rmtemp=`mktemp`
 cat README.md | \
 	sed -e "s/archive\/[^t]*.tar.gz/archive\/$NEWTAG.tar.gz/" | \
-	sed -e "s/cd centos-laravel-stack-.*/cd centos-laravel-stack-$NEWTAGSHORT/" | \
+	sed -e "s/cd debian-laravel-stack-.*/cd debian-laravel-stack-$NEWTAGSHORT/" | \
 	sed -e "s/badge\/release-.*-blue/badge\/release-$NEWTAGSHORT-blue/"   >$rmtemp
 mv -f $rmtemp README.md
 
