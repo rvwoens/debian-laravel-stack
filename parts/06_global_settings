@@ -32,9 +32,10 @@ apt install -y fortune-mod
 cd /usr/local/src
 git clone https://github.com/schacon/cowsay.git
 cd cowsay
+echo "when it asks for a directory, just press enter"
 sh install.sh
 cd $INSTALLPWD
-echo "fortune | cowsay -W 100 -f small" >/etc/profile.d/cowsay.sh
+su - $username -c 'echo "fortune | cowsay -W 100 -f small" >> ~/.bashrc'
 
 logline "06.05 additional installs"
 apt install -y rsync

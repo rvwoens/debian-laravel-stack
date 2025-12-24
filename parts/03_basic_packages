@@ -21,13 +21,17 @@ logline "03.03 update system - this can take a while.."
 DEBIAN_FRONTEND=noninteractive apt update && apt upgrade -y
 
 logline "03.04 apt some sysop and dev tools"
-DEBIAN_FRONTEND=noninteractive apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git 
+apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git 
 
 logline "03.05 apt some extra tools"
 # ufw is firewall
-DEBIAN_FRONTEND=noninteractive apt install -qq -y ufw
-## optional BIG development install
-## yum groupinstall "Development Tools"
+apt install -qq -y ufw
+
+# this is for hypervisor so VM manager knows us
+apt install -qq -y acpid  cloud-init
+
+systemctl enable acpid
+systemctl start acpid
 
 logline "03.05 apt Sury repo"
 # Install dependencies

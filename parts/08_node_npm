@@ -9,29 +9,32 @@ while read -t 1 garbage; do sleep 0; done
 
 echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode
 if [ ! "$donode" = "n" ]; then
+  logline "08.01 install deb nodesource "
+	curl -fsSL https://deb.nodesource.com/setup_$NODEVER.x | bash -
+	apt install -y nodejs
 
-  logline "08.01 install nvm - the node manager"
-  # new method: yum module
-  # yum module install nodejs -y
-  # NOTE NOTE: nvm is best installed as user not as root package!!
-  su - $username -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-  # source ~/.bash_profile
+	#   logline "08.01 install nvm - the node manager"
+	#   # new method: yum module
+	#   # yum module install nodejs -y
+	#   # NOTE NOTE: nvm is best installed as user not as root package!!
+	#   su - $username -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
+	#   # source ~/.bash_profile
 
-  # logline "08.02 install node and npm"
-  # for latest version use
-  # nvm list-remote
+	#   # logline "08.02 install node and npm"
+	#   # for latest version use
+	#   # nvm list-remote
 
-  su - $username -c "nvm install $NODEVER"
-  su - $username -c "nvm use $NODEVER"
+	#   su - $username -c 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm install $NODEVER'
+	#   su - $username -c 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use $NODEVER'
   echo "Node version:"
-  su - $username -c "node -v"
+  su - $username -c "node --version"
   echo "Npm version:"
-  su - $username -c "npm -v"
+  su - $username -c 'npm --version'
 
   logline "08.03 yarn"
-  su - $username -c "npm install --global yarn"
-  #logline "08.02 gulp"
-  #npm install --global gulp-cli
+  npm install -g yarn --unsafe-perm
+  echo "Yarn version"
+  su - $username -c "yarn --version"
 
 fi
 
