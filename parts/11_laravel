@@ -13,40 +13,49 @@ myip=`curl -4 -s ifconfig.me`
 
 echo -n "A default laravel webite is optional. Install default webite @ http://$myip [Y/n]=>" && read dolaravelwebsite
 if [ ! "$dolaravelwebsite" == "n" ]; then
-  # use simple git clone for demo website
-  cd /var/www
-  composer create-project laravel/laravel laravel --no-interaction
-  sudo chown $username:nginx -R laravel
-  cd /var/www/laravel
-  echo "Run composer install"
-  composer install
+	# make sure everything exists
+	mkdir -p /var/www/laravel
+	sudo chown $username:www-data -R laravel
 
-  echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
-  mysql -u root -p$mysqlpwd -e "CREATE DATABASE laravel;"
+	su - $username <<-'UEOF'
+	# use simple git clone for demo website
+	cd /var/www
+	composer create-project laravel/laravel laravel --no-interaction
+	cd laravel
+	composer install
+UEOF
+	# back at root
+  	cd /var/www/laravel
 
-  # EOF quoted: expand bash vars
-  cat <<-EOF >.env
-	APP_NAME=Laravel
-	APP_ENV=local
-	APP_KEY=
-	APP_URL=http://localhost
+  	echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
+  	mysql -u root -p$mysqlpwd -e "CREATE DATABASE laravel;"
 
-	LOG_CHANNEL=stack
-	LOG_DEPRECATIONS_CHANNEL=null
-	LOG_LEVEL=debug
+	# EOF quoted: expand bash vars
+	cat <<-EOF >.env
+		APP_NAME=Laravel
+		APP_ENV=local
+		APP_KEY=
+		APP_URL=http://localhost
 
-	DB_CONNECTION=mysql
-	DB_HOST=127.0.0.1
-	DB_PORT=3306
-	DB_DATABASE=laravel
-	DB_USERNAME=root
-	DB_PASSWORD=$mysqlpwd
+		LOG_CHANNEL=stack
+		LOG_DEPRECATIONS_CHANNEL=null
+		LOG_LEVEL=debug
+
+		DB_CONNECTION=mysql
+		DB_HOST=127.0.0.1
+		DB_PORT=3306
+		DB_DATABASE=laravel
+		DB_USERNAME=root
+		DB_PASSWORD=$mysqlpwd
 EOF
+	su - $username <<-'UEOF'
+	cd /var/www/laravel
 	php artisan key:generate
 	echo "Now run artisan Migrate"
 	php artisan migrate
+UEOF
+	# back at root
     chmod -R a+w storage
-
 	sudo cat << EOF-nginxconf >/etc/nginx/sites-available/01-laravel.conf
 	server {
 	listen   80;
