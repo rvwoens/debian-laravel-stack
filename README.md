@@ -1,11 +1,10 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-1.0.03-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-1.0.04-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
-[![Actions Status](https://github.com/rvwoens/Debian-laravel-stack/workflows/CI/badge.svg)](https://github.com/rvwoens/Debian-laravel-stack/actions)
 
 ## Installs a fresh server with
-[![Debian version](https://img.shields.io/badge/Debian-8%209%20stream-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![Debian version](https://img.shields.io/badge/Debian-12%2013-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![PHP version](https://img.shields.io/badge/PHP-8.0%208.1%208.2%208.3-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![NGINX version](https://img.shields.io/badge/Nginx-1.20.1-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Node version](https://img.shields.io/badge/Node-24-blue)](https://github.com/rvwoens/Debian-laravel-stack)
@@ -20,20 +19,20 @@
 * Add (multiple) Laravel projects (any Laravel version) with Zero-Downtime deployment
 
 The scripts are all bash, and kept very simple so you can tweak them to your needs if you want to. 
-No stupid docker shit.
+No overengineered docker shit, superfast deployments without container builds. A simple git pull does the trick.
 
-Very easy project deployment by calling the project's  server ```puller``` script via a local ```pusher``` script
+Deployment is done by calling the project's server ```puller``` script or via a local ```pusher``` script
 Multiple servers per project support (production, staging..) through a local ```pusher.conf``` configuration
 
 ## how to install
 
-* bring up a bare Debian server somewhere (Debian 8, 9 and stream supported)
+* bring up a bare Debian server somewhere (Debian 12, 13 supported)
 * ssh as root and run:
 
 ```bash
 yum -y install tar
-curl -s -L https://github.com/rvwoens/Debian-laravel-stack/archive/v1.0.03.tar.gz | tar -xz
-cd Debian-laravel-stack-3.1.07
+curl -s -L https://github.com/rvwoens/Debian-laravel-stack/archive/v1.0.04.tar.gz | tar -xz
+cd Debian-laravel-stack-1.0.03
 ./setup_full
 ```
 
@@ -195,8 +194,8 @@ create the default user and allow sudo. Block using passwords and only allow acc
 #### 02 set hostname
 changes the hostname
 
-#### 03 repos and yums
-Add remi and epel repo, updates the system and ```yum``` the basics
+#### 03 aptgets
+Updates the system and ```aptgets``` the basics
 
 #### 04 root password
 secures the root user
