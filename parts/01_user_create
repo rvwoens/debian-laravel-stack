@@ -16,7 +16,7 @@ export username
 
 logline "01.01 add user"
 ## add the user and lock the password
-adduser $username -m -n && passwd $username -l
+adduser --disabled-password $username && passwd -l $username
 
 logline "01.02 setup ssh, bin and some settings"
 ## set user's ssh

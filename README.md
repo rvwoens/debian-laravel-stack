@@ -1,15 +1,15 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-1.0.04-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-1.0.05-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
 ## Installs a fresh server with
 [![Debian version](https://img.shields.io/badge/Debian-12%2013-blue)](https://github.com/rvwoens/Debian-laravel-stack)
-[![PHP version](https://img.shields.io/badge/PHP-8.0%208.1%208.2%208.3-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![PHP version](https://img.shields.io/badge/PHP-8.0%208.1%208.2%208.3%208.4%208.5-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![NGINX version](https://img.shields.io/badge/Nginx-1.20.1-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Node version](https://img.shields.io/badge/Node-24-blue)](https://github.com/rvwoens/Debian-laravel-stack)
-[![Redis version](https://img.shields.io/badge/Redis-6.2-blue)](https://github.com/rvwoens/Debian-laravel-stack)
-[![Laravel version](https://img.shields.io/badge/Laravel-v5%20v6%20v7%20v8%20v9%20v10-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![Redis version](https://img.shields.io/badge/Redis-6.x%207.x%208.x-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![Laravel version](https://img.shields.io/badge/Laravel-v5%20v6%20v7%20v8%20v9%20v10%20v11%20v12-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 * Debian
 * Nginx and virtual hosts
 * Php fpm & cli, composer, common php packages.
@@ -30,9 +30,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-yum -y install tar
-curl -s -L https://github.com/rvwoens/Debian-laravel-stack/archive/v1.0.04.tar.gz | tar -xz
-cd Debian-laravel-stack-1.0.03
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v1.0.05.tar.gz | tar -xz
+cd debian-laravel-stack-1.0.04
 ./setup_full
 ```
 
