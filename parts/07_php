@@ -39,7 +39,9 @@ cat $phpfpmini |
 	sed -r "s/max_execution_time = [0-9]+/max_execution_time = 720/" |
 	sed -r "s/memory_limit = [0-9]+M/memory_limit = 512M/" |
 	sed -r "s/upload_max_filesize = [0-9]+M/upload_max_filesize = 12M/" |
-	# Etc/UTC or UTC is the same
+	# minimize realpath cache as this messes with the symlinks of the releases. Allow 5s grace
+	sed -r "s/realpath_cache_ttl = [0-9]+M/realpath_cache_ttl = 5/" |
+	# Etc/UTC or UTC is the same. lets force UTC so we know that for sure
     sed -e "s/;date.timezone =/date.timezone = UTC/"  >$phpfpminitemp
 mv -f $phpfpminitemp $phpfpmini
 # mktemp creates a rw------- file. Nead to give right to users
