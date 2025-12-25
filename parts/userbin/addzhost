@@ -53,7 +53,7 @@ echo ">>>> Generating laravel directory structure for Zero-Downtime-Deploy"
 sudo mkdir $WWWSITE
 sudo mkdir -p $WWWSITE/releases/$TAG
 sudo mkdir -p $WWWSITE/storage
-sudo chown -R $USER:nginx $WWWSITE
+sudo chown -R $USER:www-data $WWWSITE
 mkdir -p $WWWSITE/storage/logs
 mkdir -p $WWWSITE/storage/framework/cache
 mkdir -p $WWWSITE/storage/framework/views
@@ -93,7 +93,7 @@ cat << EOFPULLER >$WWWSITE/puller
 	  git archive --remote=$GITREPO --format=tar \$1 | tar xf -
   fi
 	echo ">>>> Pulled \$1 archive. Now do some after-deploy work"
-	sudo chown $USER:nginx -R \$RELEASE_DIR
+	sudo chown $USER:www-data -R \$RELEASE_DIR
 	# standard symlinks
 	ln -sf \$ENV_DIR ./
 	rm -Rf storage
@@ -175,6 +175,8 @@ let "max=$((10#$max))+1"
 printf -v maxf "%02d" $max
 newconffile=$maxf-$SERVERNAME.conf
 newconf=$VHOSTDIR/$maxf-$SERVERNAME.conf
+PHPVER=`php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;'`
+echo "Current PHP version: $PHPVER"
 cat << EOF-nginxconf >/tmp/newconf
 server {
         server_name www.$SERVERNAME;
@@ -191,17 +193,12 @@ server {
    }
 
    location ~ \.php\$ {
-       fastcgi_pass 127.0.0.1:9000;
-       fastcgi_index  index.php;
-       try_files \$uri /index.php =404;
-       fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-	# note realpathroot instead of documentroot makes symbolic link resolved by nginx and solves php realpath issues
-       fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-       fastcgi_buffers 256 128k;
-       fastcgi_connect_timeout 300s;
-       fastcgi_send_timeout 300s;
-       fastcgi_read_timeout 300s;
-       include fastcgi_params;
+		include snippets/fastcgi-php.conf;
+		fastcgi_pass unix:/run/php/php$PHPVER-fpm.sock;
+		fastcgi_buffers 256 128k;
+		fastcgi_connect_timeout 300s;
+		fastcgi_send_timeout 300s;
+		fastcgi_read_timeout 300s;
     }
 }
 EOF-nginxconf
