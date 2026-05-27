@@ -2,7 +2,7 @@
 
 if [ -z "$2" ]; then
 	echo "Usage: addzhost <domain> <pull-repo> [<initial-tag>]"
-	echo "Add Zero Downtime Deployment virtual host using export from remote repository"
+	echo "Add Zero Downtime Deployment virtual LARAVEL host using export from remote repository"
  	echo "1) creates /var/www/domain"
  	echo "2) creates vhost nginx to domain and *.domain (like www.asd.nl)"
  	echo "3) creates puller to pull from git repo <pull-repo>"
@@ -32,7 +32,13 @@ SERVERNAME=$1
 
 if [ -d $WWWSITE ]; then
 	echo "$WWWSITE already exists!"
-	exit
+	echo "Remove !!! WILL REMOVE THE WHOLE DIR !!! (N/y)"
+	read removedir
+	if [ "$removedir" == "y" ]; then
+		rm -Rf $WWWSITE
+	else
+		exit
+	fi
 fi
 
 if [[ "$GITREPO" =~ ^https://github.com ]]; then
@@ -60,10 +66,17 @@ mkdir -p $WWWSITE/storage/framework/views
 mkdir -p $WWWSITE/storage/framework/sessions
 chmod a+w -R $WWWSITE/storage
 echo "STUB" >$WWWSITE/storage/stub
-cat << EOFETC >$WWWSITE/.env
-APP_ENV=prod
-APP_KEY=base64:/kWEgZL5G/I7zQi72qocObBxeHNMDJfJEwIHy+tdeAk=
-EOFETC
+
+echo "Directory structure made. Do you want to edit the .env file? (N/y)"
+read editenv
+if [ "$editenv" == "y" ]; then
+	nano $WWWSITE/.env
+else
+	cat <<-EOFETC >$WWWSITE/.env
+		APP_ENV=prod
+		APP_KEY=base64:/kWEgZL5G/I7zQi72qocObBxeHNMDJfJEwIHy+tdeAk=
+	EOFETC
+fi
 
 cd $WWWSITE
 # create puller script. Heredoc without quotes will interpolate $ and literal $ needs \$ and <<- heredoc will allow indentation
@@ -145,14 +158,27 @@ echo "Created $WWWSITE ZDD structure. Now pulling initial release"
 if $WWWSITE/puller $TAG ; then
 	echo "Successful pull. Lets continue"
 else
-	echo "The pull was not succesfull. Do you want to rollback? (N/y)"
+	echo "The pull was not succesfull. Options: "
+	echo "R) Rollback - remove directory $WWWSITE and exit - so you can try again"
+	echo "S) Stop - just exit."
+	echo "C) Continue - create NGINX site info"
 	read rollback
-	if [ "$rollback" == "y" ]; then
-		echo "Removing $WWWSITE "
-		sudo rm -Rf $WWWSITE
-		echo "Rolled back"
-		exit 1
-	fi
+	case "$rollback" in
+		R)
+			echo "Rollback"
+			echo "Removing $WWWSITE "
+			sudo rm -Rf $WWWSITE
+			echo "Rolled back"
+			exit 1
+			;;
+		C)
+			echo "Continue"
+			;;
+		S|*)
+			echo "Stop"
+			exit 1
+			;;
+	esac
 fi
 echo "------------------------- NGINX vhost ---------------------------"
 max=0
