@@ -22,17 +22,19 @@ adduser --disabled-password --gecos "" $username && passwd -l $username
 logline "01.02 setup ssh, bin and some settings"
 ## set user's ssh
 su $username <<-'EOF'
-        mkdir ~/.ssh/
-        touch ~/.ssh/authorized_keys && chmod 0600 ~/.ssh/authorized_keys
-        # add deploy key for the machine -- but now use ed25519
-        # ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
-		ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "$username@$(hostname)"
+	mkdir ~/.ssh/
+	touch ~/.ssh/authorized_keys && chmod 0600 ~/.ssh/authorized_keys
 
-        chmod 0700 ~/.ssh
+	# lets create keypair later when we know the hostname
+	# add deploy key for the machine -- but now use ed25519
+	# ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+	# ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "$username@$(hostname)"
+
+	chmod 0700 ~/.ssh
 
 	# lets make a ~/bin and add it to the path
 	mkdir ~/bin
-        echo "export PATH=\$PATH:~/bin" >> ~/.bashrc
+    echo "export PATH=\$PATH:~/bin" >> ~/.bashrc
 	echo ". ~/bin/z.sh" >> ~/.bashrc
 	echo "alias a=artisan" >> ~/.bashrc
 

@@ -233,6 +233,63 @@ sudo ln -s $newconf /etc/nginx/sites-enabled/$newconffile
 echo "Created $newconf for nginx. restarting nginx.."
 sudo service nginx restart
 
+# ----------------------------------------------------------------------
+# Let's Encrypt / certbot
+# ----------------------------------------------------------------------
+# certbot needs the HTTP vhost to be live and reachable on port 80 from
+# the public internet for the HTTP-01 challenge - that is why we run this
+# AFTER `service nginx restart` above.
+#
+# We only request a cert for the apex ($SERVERNAME) and www.$SERVERNAME.
+# The vhost server_name still contains *.$SERVERNAME so nginx will keep
+# accepting wildcard subdomain traffic, but those subdomains will not be
+# covered by this certificate (HTTP-01 cannot issue wildcards - that
+# would need a DNS-01 challenge with a DNS provider plugin).
+#
+# certbot --nginx will:
+#   1. add `listen 443 ssl;` + ssl_certificate* lines to the matching
+#      server blocks (both the www redirect block and the main block)
+#   2. with --redirect, rewrite the HTTP server to 301 to HTTPS
+# ----------------------------------------------------------------------
+echo "------------------------- Lets Encrypt (certbot) ---------------------------"
+echo "Do you want to request a Lets Encrypt certificate for $SERVERNAME and www.$SERVERNAME now? (Y/n)"
+read dossl
+if [ "$dossl" != "n" ] && [ "$dossl" != "N" ]; then
+	# Allow a default email via the CERTBOT_EMAIL env var (handy for
+	# scripted reruns) but always let the user override interactively.
+	if [ -n "$CERTBOT_EMAIL" ]; then
+		echo "Email for Lets Encrypt registration [$CERTBOT_EMAIL]:"
+	else
+		echo "Email for Lets Encrypt registration (used for renewal/expiry notices):"
+	fi
+	read certemail
+	if [ -z "$certemail" ]; then
+		certemail="$CERTBOT_EMAIL"
+	fi
+	if [ -z "$certemail" ]; then
+		echo "!! No email supplied - skipping certbot. You can re-run later with:"
+		echo "   sudo certbot --nginx -d $SERVERNAME -d www.$SERVERNAME"
+	else
+		# --non-interactive + --agree-tos so we never block on a prompt
+		# --redirect makes certbot turn the :80 vhost into a 301 to :443
+		# -d order matters: first -d becomes the cert's CN
+		sudo certbot --nginx \
+			-d $SERVERNAME -d www.$SERVERNAME \
+			--non-interactive --agree-tos --redirect \
+			--email "$certemail"
+		if [ $? -eq 0 ]; then
+			echo "certbot success - reloading nginx"
+			sudo service nginx reload
+		else
+			echo "!! certbot failed - the HTTP vhost is still live, you can retry with:"
+			echo "   sudo certbot --nginx -d $SERVERNAME -d www.$SERVERNAME --email $certemail --agree-tos"
+		fi
+	fi
+else
+	echo "Skipping certbot. You can run it later with:"
+	echo "   sudo certbot --nginx -d $SERVERNAME -d www.$SERVERNAME"
+fi
+
 echo "Adding Laravel schedule to crontab"
 cd ~/crontab
 echo "* * * * * php $WWWSITE/current/artisan schedule:run >> /dev/null 2>&1" >>crondef

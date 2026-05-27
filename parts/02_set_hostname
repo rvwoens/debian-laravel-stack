@@ -11,5 +11,12 @@ done
 hostnamectl set-hostname $hostname
 ## on debian we need a special entry for that in hosts. Use 127.0.1.1 not conflicting with localhost
 echo "127.0.1.1   $hostname" >> /etc/hosts
+
+logline "02.01 create ed25519 keypair in $username/.ssh"
+su $username <<-'EOF'
+	# now that we know the hostname, we can create the right ed25519.pub
+	ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "$username@$(hostname)"
+EOF
+
 logline "02.99 set hostname END"
 

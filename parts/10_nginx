@@ -7,6 +7,11 @@ logline "10.00 nginx START"
 logline "10.01 apt nginx"
 apt install -y nginx
 
+# certbot + the nginx plugin so addzhost can request Let's Encrypt certs
+# and automatically wire them into the generated vhost config.
+logline "10.01b apt certbot + nginx plugin"
+apt install -y certbot python3-certbot-nginx
+
 # need to add php to the default nginx config
 sed -i 's/index index.html index.htm index.nginx-debian.html;/index index.php index.html index.htm;/' /etc/nginx/sites-available/default
 
