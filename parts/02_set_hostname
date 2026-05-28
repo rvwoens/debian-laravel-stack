@@ -18,5 +18,50 @@ su $username <<-'EOF'
 	ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "$username@$(hostname)"
 EOF
 
+# --------------------------------------------------------------------------
+# Gather all "downstream" questions up front so the rest of the install
+# runs unattended. setup_full sources each part with `.` so the variables
+# set here stay alive across parts 04, 06, 08, 09, 11 and 12.
+#
+# Each consuming part has a `[ -z "$VAR" ]` guard so it can still be run
+# standalone (bash ./parts/NN_xxx) and will prompt then.
+#
+# You can also pre-seed any of these from the environment to make the run
+# fully hands-off, e.g.
+#     rootpas=n timezone=Europe/Amsterdam donode=y domysql=y \
+#     doredis=y dolaravelwebsite=n ./setup_full
+# --------------------------------------------------------------------------
+logline "02.50 pre-asking optional install questions"
+
+# flush keyboard buffer before prompting
+while read -t 1 garbage; do sleep 0; done
+
+# Root password policy (consumed by parts/04_root_password)
+echo -n "Do you want a long secure root password (l) or no password at all (n) [N/l]=>" && read rootpas
+
+# Timezone (consumed by parts/06_global_settings) - blank = UTC
+echo -n "What timezone do you want (enter for UTC) =>" && read timezone
+
+# Node/npm/pnpm (consumed by parts/08_node_npm)
+echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode
+
+# MariaDB / MySQL (consumed by parts/09_mariadb_mysql)
+echo -n "MYSQL (MARIADB) is optional. Install mariadb [Y/n]=>" && read domysql
+# Ask for the mariadb root password whenever mariadb is going to be installed.
+# Currently consumed by parts/11_laravel (creates the laravel demo DB) but is
+# handy to have set for any later mysql work in the same session.
+if [ ! "$domysql" = "n" ]; then
+	echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
+fi
+
+# Redis (consumed by parts/12_redis)
+echo -n "redis installation is optional. Install Redis [Y/n]=>" && read doredis
+
+# Default Laravel demo site (consumed by parts/11_laravel)
+myip=`curl -4 -s ifconfig.me`
+echo -n "A default laravel webite is optional. Install default webite @ http://$myip [Y/n]=>" && read dolaravelwebsite
+
+
+
 logline "02.99 set hostname END"
 

@@ -14,7 +14,12 @@ myip=`curl -4 -s ifconfig.me`
 
 #logline "11.02 create a simple (github/laravel/laravel) site on http://$myip using addzhost?"
 
-echo -n "A default laravel webite is optional. Install default webite @ http://$myip [Y/n]=>" && read dolaravelwebsite
+# $dolaravelwebsite is normally pre-asked in parts/02_set_hostname so this part can run
+# unattended. Fall back to prompting here when the script is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default "yes") is NOT re-prompted.
+if [ -z "${dolaravelwebsite+set}" ]; then
+	echo -n "A default laravel webite is optional. Install default webite @ http://$myip [Y/n]=>" && read dolaravelwebsite
+fi
 if [ ! "$dolaravelwebsite" == "n" ]; then
 	# make sure everything exists
 	echo "Creating a laravel project for user $username"
@@ -32,8 +37,13 @@ UEOF
 	# back at root
   	cd /var/www/laravel
 
-  	echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
-  	mysql -u root -p$mysqlpwd -e "CREATE DATABASE laravel;"
+	# $mysqlpwd is normally pre-asked in parts/02_set_hostname so this part can run
+	# unattended. Fall back to prompting here when the script is executed standalone.
+	# Use ${var+set} so a deliberately empty password is NOT re-prompted.
+	if [ -z "${mysqlpwd+set}" ]; then
+		echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
+	fi
+	mysql -u root -p$mysqlpwd -e "CREATE DATABASE laravel;"
 
 	# EOF quoted: expand bash vars
 	cat <<-EOF >.env

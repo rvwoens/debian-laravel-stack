@@ -7,7 +7,12 @@ logline "08.00 nvm and node and npm START"
 # flush keyboard buffer
 while read -t 1 garbage; do sleep 0; done
 
-echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode
+# $donode is normally pre-asked in parts/02_set_hostname so this part can run
+# unattended. Fall back to prompting here if the script is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default "yes") is NOT re-prompted.
+if [ -z "${donode+set}" ]; then
+	echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode
+fi
 if [ ! "$donode" = "n" ]; then
   logline "08.01 install deb nodesource "
 	curl -fsSL https://deb.nodesource.com/setup_$NODEVER.x | bash -

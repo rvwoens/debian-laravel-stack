@@ -3,21 +3,59 @@
 . ${BASH_SOURCE%/*}/00_settings
 
 logline "09.00 mariadb mysql START"
-echo -n "MYSQL (MARIADB) is optional. Install mariadb [Y/n]=>" && read domysql
+# $domysql is normally pre-asked in parts/02_set_hostname so this part can run
+# unattended. Fall back to prompting here when the script is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default "yes") is NOT re-prompted.
+if [ -z "${domysql+set}" ]; then
+	echo -n "MYSQL (MARIADB) is optional. Install mariadb [Y/n]=>" && read domysql
+fi
 if [ ! "$domysql" = "n" ]; then
 
   logline "09.01 apt mariadb"
 
-  apt install -y mariadb-server mariadb-client
+  # Make the apt install completely non-interactive:
+  #  - DEBIAN_FRONTEND=noninteractive  -> never show debconf TUI dialogs
+  #  - NEEDRESTART_MODE=a              -> auto-restart services (Debian 12+)
+  #  - --force-confdef / --force-confold -> on package config conflicts, keep
+  #    the existing config and silently accept package defaults (no Y/N prompt)
+  DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt install -y \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" \
+    mariadb-server mariadb-client
 
   logline "09.02 enable and start"
   systemctl enable mariadb
   systemctl start mariadb
 
-  logline "09.03 make mysql secure"
-  echo "#################### MariaDB secure installation is going to ask some questions"
-  echo "#################### The current password is still empty, just press enter when asked for"
-  mariadb-secure-installation
+  # made non-interactive: 
+  # mariadb-secure-installation
+  logline "09.03 make mysql secure (scripted equivalent of mariadb-secure-installation)"
+  # mariadb-secure-installation is interactive only; we replicate its actions
+  # via SQL so the whole step runs unattended. Fresh installs of mariadb use
+  # unix_socket auth for root@localhost, so we can connect as root with no
+  # password from this script (which runs as root).
+  #
+  # If $mysqlpwd was not collected (e.g. running this part standalone without
+  # going through step 02), fall back to prompting now.
+  if [ -z "${mysqlpwd+set}" ]; then
+    echo -n "Enter a new mysql (mariadb) root password =>" && read mysqlpwd
+  fi
+
+  # Use a HEREDOC piped into mariadb. Note the SQL escaping of the underscore
+  # in 'test\_%' so it is treated as a literal underscore in the LIKE pattern.
+  mariadb -u root <<-SQL
+	-- set / change the root password (keeps unix_socket plugin as fallback
+	-- so root on the local box can still log in without a password)
+	ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysqlpwd';
+	-- remove anonymous users
+	DELETE FROM mysql.global_priv WHERE User='';
+	-- disallow remote root login
+	DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');
+	-- drop the default test database and its grants
+	DROP DATABASE IF EXISTS test;
+	DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+	FLUSH PRIVILEGES;
+	SQL
 
 fi
 

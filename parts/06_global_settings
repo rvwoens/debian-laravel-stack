@@ -9,8 +9,12 @@ while read -t 1 garbage; do sleep 0; done
 
 ## set local timezone
 logline "06.02 set local timezone"
-echo -n "What timezone do you want (enter for UTC) =>"
-read timezone
+# $timezone is normally pre-asked in parts/02_set_hostname (blank == UTC).
+# Use ${var+set} to detect "asked but blank" vs "never asked".
+if [ -z "${timezone+set}" ]; then
+	echo -n "What timezone do you want (enter for UTC) =>"
+	read timezone
+fi
 if [ "$timezone" == "" ]; then
 	timedatectl set-timezone UTC
 else
@@ -38,8 +42,9 @@ apt install -y fortune-mod
 cd /usr/local/src
 git clone https://github.com/schacon/cowsay.git
 cd cowsay
-echo "when it asks for a directory, just press enter"
-sh install.sh
+# install.sh prompts for a target directory; piping a newline accepts the default
+# (use `yes "" | sh install.sh` if it ever grows additional prompts)
+echo | sh install.sh
 cd $INSTALLPWD
 su - $username -c 'echo "fortune | cowsay -W 100 -f small" >> ~/.bashrc'
 

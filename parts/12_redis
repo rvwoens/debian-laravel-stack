@@ -5,7 +5,12 @@
 logline "12.00 redis START"
 
 logline "12.01 Redis Server install"
-echo -n "redis installation is optional. Install Redis [Y/n]=>" && read doredis
+# $doredis is normally pre-asked in parts/02_set_hostname so this part can run
+# unattended. Fall back to prompting here when the script is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default "yes") is NOT re-prompted.
+if [ -z "${doredis+set}" ]; then
+	echo -n "redis installation is optional. Install Redis [Y/n]=>" && read doredis
+fi
 if [ ! "$doredis" == "n" ]; then
 	logline "12.02 Installing redis"
 	apt install -y redis-server
