@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-2.0.08-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-2.0.09-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -21,7 +21,7 @@
 * Nvm, Node, npm, yarn, pnpm
 * MariaDB
 * Redis
-* Add (multiple) Laravel projects (any Laravel version) with fast Zero-Downtime deployment
+* Tools to add (multiple) Laravel projects (any Laravel version) with fast Zero-Downtime deployment
 
 The scripts are all bash, and kept very simple so you can tweak them to your needs if you want to. 
 No overengineered docker shit, superfast deployments without container builds. A simple git pull does the trick.
@@ -42,8 +42,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.08.tar.gz | tar -xz
-cd debian-laravel-stack-2.0.08
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.09.tar.gz | tar -xz
+cd debian-laravel-stack-2.0.09
 ./setup_full
 ```
 
@@ -57,8 +57,8 @@ Log in as the default (created) user and run
 
 ### Note:
 You need access privileges from this server on the repository.
-- For github or gitlab, Go to settings->ssh keys and add the contents of ```~/.ssh/id_rsa.pub``` to a new ssh key.
-- As an alternative you can use the readonly ```https://github.com/<user>/<repo>.git``` (default) repo url, but in this case the puller will just use a git clone
+- there are 2 tools: ```gitlab-auth``` and ```github-auth`` which will give API access from this server to place keys automatically
+- Alternatively add the contents of ```~/.ssh/id_ed25519.pub``` to allow github/lab deployments
 
 ### Directory structure
 The zero downtime deployment creates the following directory structure for each app:
