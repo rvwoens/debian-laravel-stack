@@ -2,25 +2,26 @@
 # ----------------------------------------------------------------------
 # gitlab-auth [HOSTNAME]
 # ----------------------------------------------------------------------
-# Ensure the `glab` CLI is installed AND authenticated for HOSTNAME
-# (default: gitlab.com). Self-hosted GitLab works too: e.g.
-#     gitlab-auth git.example.com
+# Authenticate the `glab` CLI for HOSTNAME (default: gitlab.com).
+# Self-hosted GitLab works too:    gitlab-auth git.example.com
+#
+# `glab` itself is installed by setup_full step 03.07 - this script does
+# NOT install it (the stack assumes a fresh-server install path; see the
+# install note at the top of README.md).
 #
 # Behaviour:
-#   - If glab is not installed   -> offer to install the latest upstream .deb
-#                                   (Debian's package is multiple years old).
-#   - If already authenticated   -> print status, exit 0.
+#   - If already authenticated for HOSTNAME -> print status, exit 0.
 #   - Else try OAuth device flow (clean UX, needs glab >= 1.55 and a
 #     GitLab server >= 17.9; gitlab.com always qualifies).
-#   - Else fall back to Personal Access Token paste (read -s, fed via stdin
-#     so the token never appears on the command line / `ps` output).
+#   - Else fall back to Personal Access Token paste (read -s, fed via
+#     stdin so the token never appears on the command line / `ps`).
 #
 # Exit codes:
 #   0 = authenticated for HOSTNAME
-#   1 = failed (install declined, no token, etc.)
+#   1 = failed (glab missing, login cancelled, no token, etc.)
 #
-# This script is also called by addzhost when a deploy-key auto-add is
-# needed for a gitlab.com / self-hosted GitLab repository.
+# Also called by addzhost when a deploy-key auto-add is needed for a
+# gitlab.com / self-hosted GitLab repository.
 # ----------------------------------------------------------------------
 
 set -u
@@ -33,54 +34,14 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
 fi
 
 # ----------------------------------------------------------------------
-# Install glab (latest upstream .deb) if missing. Returns 0 on success.
-# ----------------------------------------------------------------------
-install_glab() {
-	echo ">>>> Installing glab (GitLab CLI) - latest .deb from gitlab.com upstream"
-	# Need jq to parse the releases API.
-	sudo apt install -y jq
-
-	# Map Debian arch names to the labels glab uses in its release asset names.
-	#   amd64/arm64/s390x pass through; i386 -> 386, armhf -> armv6, ppc64el -> ppc64le
-	local arch asset_arch
-	arch=$(dpkg --print-architecture)
-	case "$arch" in
-		i386)    asset_arch=386     ;;
-		armhf)   asset_arch=armv6   ;;
-		ppc64el) asset_arch=ppc64le ;;
-		*)       asset_arch="$arch" ;;
-	esac
-
-	# Filter on the plain `.name` field (not the percent-encoded `.url`) and
-	# use `.direct_asset_url` for the actual download.
-	local url
-	url=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest" \
-		| jq -r --arg name "_linux_${asset_arch}.deb" \
-			'.assets.links[] | select(.name | endswith($name)) | .direct_asset_url' \
-		| head -n1)
-	if [ -z "$url" ]; then
-		echo "!! could not find a glab .deb for arch=$arch (asset arch=$asset_arch)"
-		return 1
-	fi
-	local tmp
-	tmp=$(mktemp --suffix=.deb)
-	curl -fsSL "$url" -o "$tmp"
-	# apt install (not dpkg -i) so any deps get pulled in.
-	sudo DEBIAN_FRONTEND=noninteractive apt install -y "$tmp"
-	rm -f "$tmp"
-	command -v glab >/dev/null 2>&1
-}
-
-# ----------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------
 if ! command -v glab >/dev/null 2>&1; then
 	echo "!! glab (GitLab CLI) is not installed."
-	echo -n "Install it now via apt? (needs sudo) [Y/n] >" && read yn
-	case "$yn" in
-		n|N) echo "Aborted."; exit 1 ;;
-	esac
-	install_glab || { echo "!! glab install failed"; exit 1; }
+	echo "!! This stack is for fresh installs - glab should have been installed"
+	echo "!! by setup_full step 03.07. To install manually now, re-run the block:"
+	echo "!!     sudo bash parts/03_basic_packages       # or just the 03.07 stanza"
+	exit 1
 fi
 
 # Already authenticated? Done.

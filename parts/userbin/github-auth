@@ -2,25 +2,25 @@
 # ----------------------------------------------------------------------
 # github-auth [HOSTNAME]
 # ----------------------------------------------------------------------
-# Ensure the `gh` CLI is installed AND authenticated for HOSTNAME
-# (default: github.com). GitHub Enterprise Server works too:
-#     github-auth github.mycorp.com
+# Authenticate the `gh` CLI for HOSTNAME (default: github.com).
+# GitHub Enterprise Server works too:    github-auth github.mycorp.com
+#
+# `gh` itself is installed by setup_full step 03.06 - this script does
+# NOT install it (the stack assumes a fresh-server install path; see the
+# install note at the top of README.md).
 #
 # Behaviour:
-#   - If gh is not installed     -> offer to install (official upstream apt
-#                                   repo at cli.github.com; Debian's own
-#                                   community gh is noted as broken).
-#   - If already authenticated   -> print status, exit 0.
+#   - If already authenticated for HOSTNAME -> print status, exit 0.
 #   - Else run `gh auth login --hostname HOSTNAME --git-protocol ssh --web`
 #     which uses the device-code flow (prints a short code + a generic URL
 #     you open in any browser on any machine - no callback needed).
 #
 # Exit codes:
 #   0 = authenticated for HOSTNAME
-#   1 = failed (install declined, login cancelled, etc.)
+#   1 = failed (gh missing, login cancelled, etc.)
 #
-# This script is also called by addzhost when a deploy-key auto-add is
-# needed for a github.com / GHE repository.
+# Also called by addzhost when a deploy-key auto-add is needed for a
+# github.com / GHE repository.
 # ----------------------------------------------------------------------
 
 set -u
@@ -33,33 +33,14 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
 fi
 
 # ----------------------------------------------------------------------
-# Install gh from the official upstream apt repo. Returns 0 on success.
-# We avoid Debian's community 'gh' package - upstream notes (Nov 2025)
-# that 2.45.x / 2.46.x are broken against current GitHub APIs.
-# ----------------------------------------------------------------------
-install_gh() {
-	echo ">>>> Installing gh (GitHub CLI) - official cli.github.com apt repo"
-	sudo mkdir -p -m 755 /etc/apt/keyrings
-	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-		| sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
-	sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-		| sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-	sudo apt update
-	sudo DEBIAN_FRONTEND=noninteractive apt install -y gh
-	command -v gh >/dev/null 2>&1
-}
-
-# ----------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------
 if ! command -v gh >/dev/null 2>&1; then
 	echo "!! gh (GitHub CLI) is not installed."
-	echo -n "Install it now via apt? (needs sudo) [Y/n] >" && read yn
-	case "$yn" in
-		n|N) echo "Aborted."; exit 1 ;;
-	esac
-	install_gh || { echo "!! gh install failed"; exit 1; }
+	echo "!! This stack is for fresh installs - gh should have been installed"
+	echo "!! by setup_full step 03.06. To install manually now, re-run the block:"
+	echo "!!     sudo bash parts/03_basic_packages       # or just the 03.06 stanza"
+	exit 1
 fi
 
 # Already authenticated? Done.
