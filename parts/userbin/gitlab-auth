@@ -1,0 +1,139 @@
+#!/bin/bash
+# ----------------------------------------------------------------------
+# gitlab-auth [HOSTNAME]
+# ----------------------------------------------------------------------
+# Ensure the `glab` CLI is installed AND authenticated for HOSTNAME
+# (default: gitlab.com). Self-hosted GitLab works too: e.g.
+#     gitlab-auth git.example.com
+#
+# Behaviour:
+#   - If glab is not installed   -> offer to install the latest upstream .deb
+#                                   (Debian's package is multiple years old).
+#   - If already authenticated   -> print status, exit 0.
+#   - Else try OAuth device flow (clean UX, needs glab >= 1.55 and a
+#     GitLab server >= 17.9; gitlab.com always qualifies).
+#   - Else fall back to Personal Access Token paste (read -s, fed via stdin
+#     so the token never appears on the command line / `ps` output).
+#
+# Exit codes:
+#   0 = authenticated for HOSTNAME
+#   1 = failed (install declined, no token, etc.)
+#
+# This script is also called by addzhost when a deploy-key auto-add is
+# needed for a gitlab.com / self-hosted GitLab repository.
+# ----------------------------------------------------------------------
+
+set -u
+
+GLAB_HOST="${1:-gitlab.com}"
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+	sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+	exit 0
+fi
+
+# ----------------------------------------------------------------------
+# Install glab (latest upstream .deb) if missing. Returns 0 on success.
+# ----------------------------------------------------------------------
+install_glab() {
+	echo ">>>> Installing glab (GitLab CLI) - latest .deb from gitlab.com upstream"
+	# Need jq to parse the releases API.
+	sudo apt install -y jq
+
+	# Map Debian arch names to the labels glab uses in its release asset names.
+	#   amd64/arm64/s390x pass through; i386 -> 386, armhf -> armv6, ppc64el -> ppc64le
+	local arch asset_arch
+	arch=$(dpkg --print-architecture)
+	case "$arch" in
+		i386)    asset_arch=386     ;;
+		armhf)   asset_arch=armv6   ;;
+		ppc64el) asset_arch=ppc64le ;;
+		*)       asset_arch="$arch" ;;
+	esac
+
+	# Filter on the plain `.name` field (not the percent-encoded `.url`) and
+	# use `.direct_asset_url` for the actual download.
+	local url
+	url=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest" \
+		| jq -r --arg name "_linux_${asset_arch}.deb" \
+			'.assets.links[] | select(.name | endswith($name)) | .direct_asset_url' \
+		| head -n1)
+	if [ -z "$url" ]; then
+		echo "!! could not find a glab .deb for arch=$arch (asset arch=$asset_arch)"
+		return 1
+	fi
+	local tmp
+	tmp=$(mktemp --suffix=.deb)
+	curl -fsSL "$url" -o "$tmp"
+	# apt install (not dpkg -i) so any deps get pulled in.
+	sudo DEBIAN_FRONTEND=noninteractive apt install -y "$tmp"
+	rm -f "$tmp"
+	command -v glab >/dev/null 2>&1
+}
+
+# ----------------------------------------------------------------------
+# main
+# ----------------------------------------------------------------------
+if ! command -v glab >/dev/null 2>&1; then
+	echo "!! glab (GitLab CLI) is not installed."
+	echo -n "Install it now via apt? (needs sudo) [Y/n] >" && read yn
+	case "$yn" in
+		n|N) echo "Aborted."; exit 1 ;;
+	esac
+	install_glab || { echo "!! glab install failed"; exit 1; }
+fi
+
+# Already authenticated? Done.
+if glab auth status --hostname "$GLAB_HOST" >/dev/null 2>&1; then
+	echo ">>>> glab already authenticated for $GLAB_HOST"
+	glab auth status --hostname "$GLAB_HOST" || true
+	exit 0
+fi
+
+echo ""
+echo ">>>> glab needs to authenticate for $GLAB_HOST"
+
+# Option 1: OAuth device-code flow (cleanest UX). Prints a short code +
+# URL, polls until you authorize in any browser on any machine. No token
+# to copy/paste, no localhost callback. Requires glab >= 1.55 AND a
+# GitLab server >= 17.9 (gitlab.com always qualifies).
+echo ""
+echo "    Trying OAuth device-code flow (works on gitlab.com and self-hosted GitLab >= 17.9)..."
+if glab auth login --hostname "$GLAB_HOST" --git-protocol ssh --device \
+	&& glab auth status --hostname "$GLAB_HOST" >/dev/null 2>&1; then
+	echo ">>>> glab is now authenticated for $GLAB_HOST (device flow)."
+	exit 0
+fi
+
+# Option 2: Personal Access Token paste fallback. Works against every
+# glab version and every GitLab server.
+echo ""
+echo "!! device flow not available or not completed - falling back to token paste."
+echo ""
+echo "    1) Open this URL in ANY browser (on any machine) to create a PAT:"
+echo "         https://$GLAB_HOST/-/user_settings/personal_access_tokens"
+echo "    2) Required scopes:   api   +   write_repository"
+echo "       (glab needs both even if you only intend to read.)"
+echo "    3) Name it something like 'gitlab-auth-$(hostname)' and copy the token."
+echo ""
+echo -n "Paste the token here (input hidden, then press Enter): "
+read -s _pat
+echo ""
+if [ -z "$_pat" ]; then
+	echo "!! no token entered - aborted"
+	exit 1
+fi
+# Pipe via stdin so the token is never on the command line / never in `ps`.
+if ! printf '%s' "$_pat" \
+	| glab auth login --hostname "$GLAB_HOST" --git-protocol ssh --stdin; then
+	echo "!! glab auth login --stdin failed"
+	unset _pat
+	exit 1
+fi
+unset _pat
+if ! glab auth status --hostname "$GLAB_HOST" >/dev/null 2>&1; then
+	echo "!! glab still reports not-authenticated"
+	exit 1
+fi
+echo ">>>> glab is now authenticated for $GLAB_HOST (token)."
+exit 0

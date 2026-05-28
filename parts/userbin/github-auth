@@ -1,0 +1,84 @@
+#!/bin/bash
+# ----------------------------------------------------------------------
+# github-auth [HOSTNAME]
+# ----------------------------------------------------------------------
+# Ensure the `gh` CLI is installed AND authenticated for HOSTNAME
+# (default: github.com). GitHub Enterprise Server works too:
+#     github-auth github.mycorp.com
+#
+# Behaviour:
+#   - If gh is not installed     -> offer to install (official upstream apt
+#                                   repo at cli.github.com; Debian's own
+#                                   community gh is noted as broken).
+#   - If already authenticated   -> print status, exit 0.
+#   - Else run `gh auth login --hostname HOSTNAME --git-protocol ssh --web`
+#     which uses the device-code flow (prints a short code + a generic URL
+#     you open in any browser on any machine - no callback needed).
+#
+# Exit codes:
+#   0 = authenticated for HOSTNAME
+#   1 = failed (install declined, login cancelled, etc.)
+#
+# This script is also called by addzhost when a deploy-key auto-add is
+# needed for a github.com / GHE repository.
+# ----------------------------------------------------------------------
+
+set -u
+
+GH_HOST="${1:-github.com}"
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+	sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+	exit 0
+fi
+
+# ----------------------------------------------------------------------
+# Install gh from the official upstream apt repo. Returns 0 on success.
+# We avoid Debian's community 'gh' package - upstream notes (Nov 2025)
+# that 2.45.x / 2.46.x are broken against current GitHub APIs.
+# ----------------------------------------------------------------------
+install_gh() {
+	echo ">>>> Installing gh (GitHub CLI) - official cli.github.com apt repo"
+	sudo mkdir -p -m 755 /etc/apt/keyrings
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+		| sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+	sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+		| sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+	sudo apt update
+	sudo DEBIAN_FRONTEND=noninteractive apt install -y gh
+	command -v gh >/dev/null 2>&1
+}
+
+# ----------------------------------------------------------------------
+# main
+# ----------------------------------------------------------------------
+if ! command -v gh >/dev/null 2>&1; then
+	echo "!! gh (GitHub CLI) is not installed."
+	echo -n "Install it now via apt? (needs sudo) [Y/n] >" && read yn
+	case "$yn" in
+		n|N) echo "Aborted."; exit 1 ;;
+	esac
+	install_gh || { echo "!! gh install failed"; exit 1; }
+fi
+
+# Already authenticated? Done.
+if gh auth status --hostname "$GH_HOST" >/dev/null 2>&1; then
+	echo ">>>> gh already authenticated for $GH_HOST"
+	gh auth status --hostname "$GH_HOST" || true
+	exit 0
+fi
+
+echo ""
+echo ">>>> gh needs to authenticate for $GH_HOST"
+echo "    Using device-code flow: gh will print a short code + a URL;"
+echo "    open the URL on any device with a browser, paste the code, authorize."
+echo ""
+if gh auth login --hostname "$GH_HOST" --git-protocol ssh --web \
+	&& gh auth status --hostname "$GH_HOST" >/dev/null 2>&1; then
+	echo ">>>> gh is now authenticated for $GH_HOST."
+	exit 0
+fi
+
+echo "!! gh auth login did not complete - aborted"
+exit 1

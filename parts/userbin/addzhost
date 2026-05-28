@@ -104,10 +104,12 @@ detect_provider() {
 
 # ----------------------------------------------------------------------
 # try_autoadd_deploykey
-#   Detects gh / glab; if installed AND authenticated for the right
-#   provider, offers to add $MYPUBKEY as a deploy key on the remote repo.
+#   If $GITREPO points at a github.com or gitlab.com (or self-hosted)
+#   repo, delegate the install + auth of gh / glab to the standalone
+#   helpers `github-auth` / `gitlab-auth` (in ~/bin), then call the CLI
+#   to add $MYPUBKEY as a read-only deploy key.
 #   Returns 0 on success (key added), non-zero otherwise (so caller can
-#   fall back to the manual paste flow).
+#   fall back to the manual paste-the-pubkey-yourself flow).
 # ----------------------------------------------------------------------
 try_autoadd_deploykey() {
 	# Each early-return below tells the user WHY auto-add was skipped, so it
@@ -126,116 +128,50 @@ try_autoadd_deploykey() {
 		echo "!! auto-add skipped: host in \$GITREPO is neither github* nor gitlab* (no CLI to use)"
 		return 1
 	fi
+
+	# Re-extract the bare host from $GITREPO so self-hosted github.example.com /
+	# gitlab.example.com work and so the deploy-key call hits the right API.
+	local host
+	if [[ "$GITREPO" =~ ^git@([^:]+): ]]; then
+		host="${BASH_REMATCH[1]}"
+	elif [[ "$GITREPO" =~ ^https?://([^/]+)/ ]]; then
+		host="${BASH_REMATCH[1]}"
+	else
+		host=""
+	fi
+
 	local title="$(hostname)-$(basename "$WWWSITE")"
 
 	case "$PROVIDER" in
 		github)
-			if ! command -v gh >/dev/null 2>&1; then
-				echo "!! auto-add skipped: gh (GitHub CLI) is not installed on this server"
-				echo -n "Install gh now via apt? (needs sudo) [Y/n] >" && read yn
-				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-				# Use the official upstream apt repo (Debian's community gh is
-				# noted as broken against current github APIs).
-				sudo mkdir -p -m 755 /etc/apt/keyrings
-				curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-					| sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
-				sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
-				echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-					| sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-				sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y gh
-				if ! command -v gh >/dev/null 2>&1; then
-					echo "!! gh install failed - falling back to manual"
-					return 1
-				fi
+			# Delegate install + auth to ~/bin/github-auth (independent script,
+			# can also be run by hand any time). It exits 0 only when gh is
+			# installed AND authenticated for the host.
+			if ! github-auth "${host:-github.com}"; then
+				echo "!! github-auth did not complete - falling back to manual deploy-key paste flow"
+				return 1
 			fi
-			# `gh auth status` returns 0 only when authenticated for github.com.
-			# If not authenticated, offer to run the interactive login flow.
-			# `gh auth login --web` prints a one-time code + URL the user opens
-			# in any browser (works fine over SSH; the server itself does not
-			# need a browser). --git-protocol ssh matches our ssh git remote.
-			if ! gh auth status >/dev/null 2>&1; then
-				echo "!! gh CLI is installed but not authenticated for github.com."
-				echo -n "Run 'gh auth login' now to authenticate? [Y/n] >" && read yn
-				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-				gh auth login --hostname github.com --git-protocol ssh --web || true
-				# Re-check; if the login was cancelled, fall back to manual.
-				if ! gh auth status >/dev/null 2>&1; then
-					echo "!! still not authenticated - falling back to manual paste flow"
-					return 1
-				fi
-				echo ">>>> gh is now authenticated."
-			fi
-			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on github.com/$OWNERREPO ? [Y/n] >" && read yn
+			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on ${host:-github.com}/$OWNERREPO ? [Y/n] >" && read yn
 			if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-			# gh repo deploy-key add <key-file> --title <t> -R owner/repo
-			# (no --allow-write flag means read-only, which is what we want)
+			# No --allow-write flag means read-only, which is what we want.
 			if gh repo deploy-key add "$MYPUBKEY" --title "$title" -R "$OWNERREPO"; then
-				echo ">>>> Deploy key uploaded to github.com/$OWNERREPO"
+				echo ">>>> Deploy key uploaded to ${host:-github.com}/$OWNERREPO"
 				return 0
 			fi
 			echo "!! gh failed to add the deploy key (already exists?)"
 			return 1
 			;;
 		gitlab)
-			if ! command -v glab >/dev/null 2>&1; then
-				echo "!! auto-add skipped: glab (GitLab CLI) is not installed on this server"
-				echo -n "Install glab now (download upstream .deb)? (needs sudo) [Y/n] >" && read yn
-				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-				# Same install recipe as parts/03_basic_packages step 03.07.
-				sudo apt install -y jq
-				local _arch=$(dpkg --print-architecture)
-				# Map Debian arch name to glab asset arch label.
-				local _asset_arch
-				case "$_arch" in
-					i386)    _asset_arch=386     ;;
-					armhf)   _asset_arch=armv6   ;;
-					ppc64el) _asset_arch=ppc64le ;;
-					*)       _asset_arch="$_arch" ;;
-				esac
-				local _url=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest" \
-					| jq -r --arg name "_linux_${_asset_arch}.deb" \
-						'.assets.links[] | select(.name | endswith($name)) | .direct_asset_url' \
-					| head -n1)
-				if [ -z "$_url" ]; then
-					echo "!! could not find a glab .deb for arch=$_arch (asset arch=$_asset_arch) - falling back to manual"
-					return 1
-				fi
-				local _tmp=$(mktemp --suffix=.deb)
-				curl -fsSL "$_url" -o "$_tmp"
-				sudo DEBIAN_FRONTEND=noninteractive apt install -y "$_tmp"
-				rm -f "$_tmp"
-				if ! command -v glab >/dev/null 2>&1; then
-					echo "!! glab install failed - falling back to manual"
-					return 1
-				fi
-			fi
-			# Same pattern as gh above: if installed but not authenticated for
-			# the matching host, offer to run the interactive login. We pass
-			# --hostname explicitly so self-hosted GitLab works too.
-			# glab auth login is interactive (browser / token); over SSH the
-			# browser flow shows a one-time code the user opens in any browser.
-			local glab_host=gitlab.com
-			# Re-detect the hostname for self-hosted gitlabs from $GITREPO.
-			if [[ "$GITREPO" =~ ^git@([^:]+): ]]; then
-				glab_host="${BASH_REMATCH[1]}"
-			elif [[ "$GITREPO" =~ ^https?://([^/]+)/ ]]; then
-				glab_host="${BASH_REMATCH[1]}"
-			fi
-			if ! glab auth status --hostname "$glab_host" >/dev/null 2>&1; then
-				echo "!! glab CLI is installed but not authenticated for $glab_host."
-				echo -n "Run 'glab auth login --hostname $glab_host' now to authenticate? [Y/n] >" && read yn
-				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-				glab auth login --hostname "$glab_host" || true
-				if ! glab auth status --hostname "$glab_host" >/dev/null 2>&1; then
-					echo "!! still not authenticated - falling back to manual paste flow"
-					return 1
-				fi
-				echo ">>>> glab is now authenticated for $glab_host."
+			# Delegate install + auth to ~/bin/gitlab-auth (independent
+			# script). Handles glab install, device-code flow, and the
+			# PAT-paste fallback.
+			if ! gitlab-auth "${host:-gitlab.com}"; then
+				echo "!! gitlab-auth did not complete - falling back to manual deploy-key paste flow"
+				return 1
 			fi
 			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on $OWNERREPO ? [Y/n] >" && read yn
 			if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-			# glab deploy-key add <key-file> --title <t> -R group/repo
-			# (no --can-push flag means read-only)
+			# No --can-push flag means read-only.
 			if glab deploy-key add "$MYPUBKEY" --title "$title" -R "$OWNERREPO"; then
 				echo ">>>> Deploy key uploaded to $OWNERREPO"
 				return 0
@@ -270,9 +206,10 @@ while true; do
 	echo "!!   GitLab : Project -> Settings -> Repository -> Deploy keys -> Add deploy key"
 	echo "!!   GitHub : Repo    -> Settings -> Deploy keys             -> Add deploy key"
 	echo "!! (read-only is enough for pulling; tick 'write' only if puller needs to push)"
-	echo "!! Tip: authenticate gh/glab once to let addzhost auto-add this next time:"
-	echo "!!   gh   auth login                                (for github.com)"
-	echo "!!   glab auth login --hostname gitlab.com          (for gitlab.com / self-hosted: use your host)"
+	echo "!! Tip: run one of these once to let addzhost auto-add this next time:"
+	echo "!!   github-auth                       (installs + auths gh for github.com)"
+	echo "!!   gitlab-auth                       (installs + auths glab for gitlab.com)"
+	echo "!!   gitlab-auth gitlab.example.com    (for self-hosted GitLab)"
 	echo ""
 	if [ -n "$MYPUBKEY" ]; then
 		echo "------ $MYPUBKEY ------------------------------------"

@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-2.0.03-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-2.0.04-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -26,12 +26,19 @@ Multiple servers per project support (production, staging..) through a local ```
 
 ## how to install
 
+> **Note:** this stack is intended for **freshly installed Debian servers only**.
+> There is no "upgrade an existing install" path - all parts assume they are
+> running against a clean base system, configure files from scratch, and may
+> overwrite local tweaks. If you want the latest features on a box you've
+> already provisioned, the supported path is: spin up a new server, run
+> `setup_full`, and migrate your apps with `addzhost`.
+
 * bring up a bare Debian server somewhere (Debian 12, 13 supported)
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.03.tar.gz | tar -xz
-cd debian-laravel-stack-2.0.03
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.04.tar.gz | tar -xz
+cd debian-laravel-stack-2.0.04
 ./setup_full
 ```
 
