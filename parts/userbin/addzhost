@@ -46,188 +46,27 @@ else
   GITHUB_SIMPLE_REPO=N
 fi
 
-# ----------------------------------------------------------------------
 # Test that we can actually reach $GITREPO BEFORE we create any directory
 # or generate any script. The most common addzhost failure is that this
 # server's public key has not yet been added as a deploy key on the git
 # remote -- testing here means we can show that pubkey and let the user
 # add it before we touch anything.
-#
-# `git ls-remote --exit-code <url> HEAD` is read-only, works for both
-# ssh:// (git@...) and https:// remotes, and returns non-zero on any
-# access failure. We force `BatchMode=yes` on the ssh side so it fails
-# immediately instead of hanging on a passphrase / password prompt, and
-# `StrictHostKeyChecking=accept-new` so we trust github/gitlab on first
-# contact (with a warning if the key changes later).
-# ----------------------------------------------------------------------
-# Pick the pubkey we will offer / upload (prefer ed25519 over rsa).
-if [ -f ~/.ssh/id_ed25519.pub ]; then
-	MYPUBKEY=~/.ssh/id_ed25519.pub
-elif [ -f ~/.ssh/id_rsa.pub ]; then
-	MYPUBKEY=~/.ssh/id_rsa.pub
-else
-	MYPUBKEY=""
-fi
+# The repo-check / pubkey-detect / gh-glab autoadd logic lives in a small
+# helper library so addzhost itself stays focussed on the laravel-deploy
+# scaffolding work below.
+ADDZHOST_DIR="$(dirname "$(readlink -f "$0")")"
+. "$ADDZHOST_DIR/lib/addzhost-repo.sh"
+. "$ADDZHOST_DIR/lib/addzhost-ssl.sh"
 
-# ----------------------------------------------------------------------
-# detect_provider <git-url>
-#   Sets PROVIDER (github|gitlab|other) and OWNERREPO (owner/repo) from
-#   either an ssh url (git@host:owner/repo.git) or an https url
-#   (https://host/owner/repo[.git]).
-# ----------------------------------------------------------------------
-detect_provider() {
-	local url="$1"
-	PROVIDER=other
-	OWNERREPO=""
-	# strip optional trailing .git
-	local stripped="${url%.git}"
-	if [[ "$stripped" =~ ^git@([^:]+):(.+)$ ]]; then
-		local host="${BASH_REMATCH[1]}"
-		OWNERREPO="${BASH_REMATCH[2]}"
-		case "$host" in
-			github.com)  PROVIDER=github ;;
-			gitlab.com)  PROVIDER=gitlab ;;
-			gitlab*)     PROVIDER=gitlab ;; # self-hosted gitlab.example.com etc.
-			github*)     PROVIDER=github ;;
-		esac
-	elif [[ "$stripped" =~ ^https?://([^/]+)/(.+)$ ]]; then
-		local host="${BASH_REMATCH[1]}"
-		OWNERREPO="${BASH_REMATCH[2]}"
-		case "$host" in
-			github.com)  PROVIDER=github ;;
-			gitlab.com)  PROVIDER=gitlab ;;
-			gitlab*)     PROVIDER=gitlab ;;
-			github*)     PROVIDER=github ;;
-		esac
-	fi
-}
-
-# ----------------------------------------------------------------------
-# try_autoadd_deploykey
-#   If $GITREPO points at a github.com or gitlab.com (or self-hosted)
-#   repo, delegate the install + auth of gh / glab to the standalone
-#   helpers `github-auth` / `gitlab-auth` (in ~/bin), then call the CLI
-#   to add $MYPUBKEY as a read-only deploy key.
-#   Returns 0 on success (key added), non-zero otherwise (so caller can
-#   fall back to the manual paste-the-pubkey-yourself flow).
-# ----------------------------------------------------------------------
-try_autoadd_deploykey() {
-	# Each early-return below tells the user WHY auto-add was skipped, so it
-	# is obvious what to fix instead of dropping straight to the manual flow.
-	if [ -z "$MYPUBKEY" ]; then
-		echo "!! auto-add skipped: no ssh public key found in ~/.ssh/ (id_ed25519.pub / id_rsa.pub)"
-		return 1
-	fi
-	detect_provider "$GITREPO"
-	if [ -z "$OWNERREPO" ]; then
-		echo "!! auto-add skipped: could not parse owner/repo from \$GITREPO=$GITREPO"
-		echo "!!   expected forms: git@HOST:OWNER/REPO.git   or   https://HOST/OWNER/REPO[.git]"
-		return 1
-	fi
-	if [ "$PROVIDER" = "other" ]; then
-		echo "!! auto-add skipped: host in \$GITREPO is neither github* nor gitlab* (no CLI to use)"
-		return 1
-	fi
-
-	# Re-extract the bare host from $GITREPO so self-hosted github.example.com /
-	# gitlab.example.com work and so the deploy-key call hits the right API.
-	local host
-	if [[ "$GITREPO" =~ ^git@([^:]+): ]]; then
-		host="${BASH_REMATCH[1]}"
-	elif [[ "$GITREPO" =~ ^https?://([^/]+)/ ]]; then
-		host="${BASH_REMATCH[1]}"
-	else
-		host=""
-	fi
-
-	local title="$(hostname)-$(basename "$WWWSITE")"
-
-	case "$PROVIDER" in
-		github)
-			# Delegate install + auth to ~/bin/github-auth (independent script,
-			# can also be run by hand any time). It exits 0 only when gh is
-			# installed AND authenticated for the host.
-			if ! github-auth "${host:-github.com}"; then
-				echo "!! github-auth did not complete - falling back to manual deploy-key paste flow"
-				return 1
-			fi
-			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on ${host:-github.com}/$OWNERREPO ? [Y/n] >" && read yn
-			if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-			# No --allow-write flag means read-only, which is what we want.
-			if gh repo deploy-key add "$MYPUBKEY" --title "$title" -R "$OWNERREPO"; then
-				echo ">>>> Deploy key uploaded to ${host:-github.com}/$OWNERREPO"
-				return 0
-			fi
-			echo "!! gh failed to add the deploy key (already exists?)"
-			return 1
-			;;
-		gitlab)
-			# Delegate install + auth to ~/bin/gitlab-auth (independent
-			# script). Handles glab install, device-code flow, and the
-			# PAT-paste fallback.
-			if ! gitlab-auth "${host:-gitlab.com}"; then
-				echo "!! gitlab-auth did not complete - falling back to manual deploy-key paste flow"
-				return 1
-			fi
-			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on $OWNERREPO ? [Y/n] >" && read yn
-			if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
-			# No --can-push flag means read-only.
-			if glab deploy-key add "$MYPUBKEY" --title "$title" -R "$OWNERREPO"; then
-				echo ">>>> Deploy key uploaded to $OWNERREPO"
-				return 0
-			fi
-			echo "!! glab failed to add the deploy key (already exists?)"
-			return 1
-			;;
-		*)
-			return 1
-			;;
-	esac
-}
-
-echo ">>>> Testing git repository access: $GITREPO"
-while true; do
-	if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
-		git ls-remote --exit-code "$GITREPO" HEAD >/dev/null 2>&1; then
-		echo ">>>> repo access OK"
-		break
-	fi
-	echo ""
-	echo "!! Could not reach $GITREPO"
-
-	# Best path first: if gh/glab is installed AND authenticated, offer to
-	# add the deploy key in one step. On success we loop back and retest.
-	if try_autoadd_deploykey; then
-		echo ">>>> retrying repo access..."
-		continue
-	fi
-
-	echo "!! Manual fallback: add the following public key as a Deploy Key on the repo:"
-	echo "!!   GitLab : Project -> Settings -> Repository -> Deploy keys -> Add deploy key"
-	echo "!!   GitHub : Repo    -> Settings -> Deploy keys             -> Add deploy key"
-	echo "!! (read-only is enough for pulling; tick 'write' only if puller needs to push)"
-	echo "!! Tip: run one of these once to let addzhost auto-add this next time:"
-	echo "!!   github-auth                       (installs + auths gh for github.com)"
-	echo "!!   gitlab-auth                       (installs + auths glab for gitlab.com)"
-	echo "!!   gitlab-auth gitlab.example.com    (for self-hosted GitLab)"
-	echo ""
-	if [ -n "$MYPUBKEY" ]; then
-		echo "------ $MYPUBKEY ------------------------------------"
-		cat "$MYPUBKEY"
-		echo "-----------------------------------------------------------------"
-	else
-		echo "!! No public key found in ~/.ssh/ - generate one first with:"
-		echo "!!   ssh-keygen -t ed25519 -C \"$USER@$(hostname)\""
-	fi
-	echo ""
-	echo -n "R) Retry  S) Stop  C) Continue anyway [R/s/c] >" && read retry
-	case "$retry" in
-		s|S) echo "Stopped."; exit 1 ;;
-		c|C) echo "Continuing despite git access failure - puller will likely fail later"; break ;;
-		*) ;; # anything else (incl. just Enter) = retry
-	esac
-done
-
+wait_for_git_repo_access "$GITREPO" "$WWWSITE"
+case $? in
+	0) ;;                   # repo OK, carry on
+	1) exit 1 ;;            # user chose Stop
+	2) ;;                   # user chose Continue anyway (puller will likely fail)
+esac
+echo "#########################################################################"
+echo "#### READY TO START"
+echo "#########################################################################"
 echo "Laravel app    at: $WWWSITE"
 echo "Git repository at: $GITREPO"
 
@@ -346,20 +185,25 @@ else
 	echo "C) Continue - create NGINX site info"
 	echo "Enter r/S/c ->"
 	read rollback
+	# Note: bash 'case' is first-match-wins. The previous version had
+	# 'S|*)' BEFORE 'C)', which made the '*' catch-all swallow every input
+	# including C, so 'Continue' was unreachable. Reorder + handle both
+	# upper and lower case, with the catch-all (which defaults to Stop)
+	# moved to the end.
 	case "$rollback" in
-		R)
+		r|R)
 			echo "Rollback"
 			echo "Removing $WWWSITE "
 			sudo rm -Rf $WWWSITE
 			echo "Rolled back"
 			exit 1
 			;;
-		S|*)
+		c|C)
+			echo "Continue"
+			;;
+		s|S|*)
 			echo "Stop"
 			exit 1
-			;;
-		C)
-			echo "Continue"
 			;;
 	esac
 fi
@@ -416,62 +260,10 @@ sudo ln -s $newconf /etc/nginx/sites-enabled/$newconffile
 echo "Created $newconf for nginx. restarting nginx.."
 sudo service nginx restart
 
-# ----------------------------------------------------------------------
-# Let's Encrypt / certbot
-# ----------------------------------------------------------------------
-# certbot needs the HTTP vhost to be live and reachable on port 80 from
-# the public internet for the HTTP-01 challenge - that is why we run this
-# AFTER `service nginx restart` above.
-#
-# We only request a cert for the apex ($SERVERNAME) and www.$SERVERNAME.
-# The vhost server_name still contains *.$SERVERNAME so nginx will keep
-# accepting wildcard subdomain traffic, but those subdomains will not be
-# covered by this certificate (HTTP-01 cannot issue wildcards - that
-# would need a DNS-01 challenge with a DNS provider plugin).
-#
-# certbot --nginx will:
-#   1. add `listen 443 ssl;` + ssl_certificate* lines to the matching
-#      server blocks (both the www redirect block and the main block)
-#   2. with --redirect, rewrite the HTTP server to 301 to HTTPS
-# ----------------------------------------------------------------------
-echo "------------------------- Lets Encrypt (certbot) ---------------------------"
-echo "Do you want to request a Lets Encrypt certificate for $SERVERNAME and www.$SERVERNAME now? (Y/n)"
-read dossl
-if [ "$dossl" != "n" ] && [ "$dossl" != "N" ]; then
-	# Allow a default email via the CERTBOT_EMAIL env var (handy for
-	# scripted reruns) but always let the user override interactively.
-	if [ -n "$CERTBOT_EMAIL" ]; then
-		echo "Email for Lets Encrypt registration [$CERTBOT_EMAIL]:"
-	else
-		echo "Email for Lets Encrypt registration (used for renewal/expiry notices):"
-	fi
-	read certemail
-	if [ -z "$certemail" ]; then
-		certemail="$CERTBOT_EMAIL"
-	fi
-	if [ -z "$certemail" ]; then
-		echo "!! No email supplied - skipping certbot. You can re-run later with:"
-		echo "   sudo certbot --nginx -d $SERVERNAME -d www.$SERVERNAME"
-	else
-		# --non-interactive + --agree-tos so we never block on a prompt
-		# --redirect makes certbot turn the :80 vhost into a 301 to :443
-		# -d order matters: first -d becomes the cert's CN
-		sudo certbot --nginx \
-			-d $SERVERNAME -d www.$SERVERNAME \
-			--non-interactive --agree-tos --redirect \
-			--email "$certemail"
-		if [ $? -eq 0 ]; then
-			echo "certbot success - reloading nginx"
-			sudo service nginx reload
-		else
-			echo "!! certbot failed - the HTTP vhost is still live, you can retry with:"
-			echo "   sudo certbot --nginx -d $SERVERNAME -d www.$SERVERNAME --email $certemail --agree-tos"
-		fi
-	fi
-else
-	echo "Skipping certbot. You can run it later with:"
-	echo "   sudo certbot --nginx -d $SERVERNAME -d www.$SERVERNAME"
-fi
+# Lets-Encrypt / certbot lives in lib/addzhost-ssl.sh. It needs the HTTP
+# vhost to be live and reachable on port :80 for the HTTP-01 challenge,
+# which is why this runs AFTER `service nginx restart` above.
+request_letsencrypt_cert "$SERVERNAME"
 
 echo "Adding Laravel schedule to crontab"
 cd ~/crontab

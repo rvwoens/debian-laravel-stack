@@ -7,16 +7,32 @@ logline "08.00 nvm and node and npm START"
 # flush keyboard buffer
 while read -t 1 garbage; do sleep 0; done
 
-# $donode is normally pre-asked in parts/02_set_hostname so this part can run
-# unattended. Fall back to prompting here if the script is executed standalone.
-# Use ${var+set} so a deliberate empty answer (= default "yes") is NOT re-prompted.
+# $donode, $doyarn and $dopnpm are normally pre-asked in parts/02_set_hostname
+# so this part can run unattended. Fall back to prompting here if the script
+# is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default) is NOT re-prompted.
 if [ -z "${donode+set}" ]; then
 	echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode
 fi
 if [ ! "$donode" = "n" ]; then
-  logline "08.01 install deb nodesource "
+	# yarn defaults to N (off) -- it is only installed on an explicit y/Y.
+	if [ -z "${doyarn+set}" ]; then
+		echo -n "  Also install yarn (alternative JS package manager) [y/N]=>" && read doyarn
+	fi
+	# pnpm defaults to Y (on) -- only skipped on an explicit n/N.
+	if [ -z "${dopnpm+set}" ]; then
+		echo -n "  Also install pnpm (recommended, fast npm alternative) [Y/n]=>" && read dopnpm
+	fi
+fi
+if [ ! "$donode" = "n" ]; then
+  logline "08.01 install deb nodesource (channel: $NODEVER)"
+	# NodeSource setup_<channel>.x handles both pinned majors (setup_24.x)
+	# and the magic 'lts' channel (setup_lts.x) which resolves to the
+	# current Active LTS automatically. See parts/00_settings for the
+	# meaning of $NODEVER.
 	curl -fsSL https://deb.nodesource.com/setup_$NODEVER.x | bash -
 	apt install -y nodejs
+	echo "Installed node:  $(node --version)   from channel '$NODEVER'"
 
 	#   logline "08.01 install nvm - the node manager"
 	#   # new method: yum module
@@ -36,15 +52,24 @@ if [ ! "$donode" = "n" ]; then
 	echo "Npm version:"
 	su - $username -c 'npm --version'
 
-	# 2026 no more yarn
-	#   logline "08.03 yarn"
-	#   npm install -g yarn --unsafe-perm
-	#   echo "Yarn version"
-	#   su - $username -c "yarn --version"
-	logline "08.03 pnpm"
-	npm install -g pnpm
-	echo "Pnpm version:"
-	su - $username -c "pnpm --version"
+	# yarn is opt-in (default N). The --unsafe-perm flag is needed when npm
+	# is running as root, otherwise the postinstall scripts of yarn refuse
+	# to run. After install we drop down to $username to print the version,
+	# which doubles as a sanity check that yarn is on the user's PATH.
+	if [ "$doyarn" = "y" ] || [ "$doyarn" = "Y" ]; then
+		logline "08.03 yarn"
+		npm install -g yarn --unsafe-perm
+		echo "Yarn version:"
+		su - $username -c "yarn --version"
+	fi
+
+	# pnpm is opt-out (default Y).
+	if [ ! "$dopnpm" = "n" ]; then
+		logline "08.04 pnpm"
+		npm install -g pnpm
+		echo "Pnpm version:"
+		su - $username -c "pnpm --version"
+	fi
 fi
 
 logline "08.99 node npm END"

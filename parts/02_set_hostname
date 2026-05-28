@@ -28,8 +28,8 @@ EOF
 #
 # You can also pre-seed any of these from the environment to make the run
 # fully hands-off, e.g.
-#     rootpas=n timezone=Europe/Amsterdam docowsay=y donode=y domysql=y \
-#     doredis=y dolaravelwebsite=n ./setup_full
+#     rootpas=n timezone=Europe/Amsterdam docowsay=y donode=y doyarn=n dopnpm=y \
+#     domysql=y doredis=y dolaravelwebsite=n ./setup_full
 # --------------------------------------------------------------------------
 logline "02.50 pre-asking optional install questions"
 
@@ -45,8 +45,19 @@ echo -n "What timezone do you want (enter for UTC) =>" && read timezone
 # Fortune + cowsay banner in the user's .bashrc (consumed by parts/06_global_settings)
 echo -n "Install fortune+cowsay banner on login (just for fun) [Y/n]=>" && read docowsay
 
-# Node/npm/pnpm (consumed by parts/08_node_npm)
+# Node/npm/pnpm/yarn (all consumed by parts/08_node_npm).
+# Node itself is the gateway -- if user says n to node, the JS package
+# managers cannot be installed anyway, so we don't bother asking.
 echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode
+if [ ! "$donode" = "n" ]; then
+	# yarn = classic Facebook/Meta JS package manager (npm-compatible).
+	# Defaulting to N because npm itself ships with node and most modern
+	# laravel/vite projects only need npm or pnpm.
+	echo -n "  Also install yarn (alternative JS package manager) [y/N]=>" && read doyarn
+	# pnpm = fast, disk-efficient npm alternative (laravel/breeze / vite friendly).
+	# Defaulting to Y because that has been the long-standing behaviour of this stack.
+	echo -n "  Also install pnpm (recommended, fast npm alternative) [Y/n]=>" && read dopnpm
+fi
 
 # MariaDB / MySQL (consumed by parts/09_mariadb_mysql)
 echo -n "MYSQL (MARIADB) is optional. Install mariadb [Y/n]=>" && read domysql

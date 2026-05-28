@@ -14,8 +14,15 @@ OS_ID=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
 OS_VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
 # Use 8.0,8.1,8.2,8.3,8.4 etc
 PHPVER=8.3
-#NODEVER=16.17.1
-NODEVER=24
+
+# Node major version used by parts/08_node_npm:
+#   "lts"  -> hits NodeSource's magic https://deb.nodesource.com/setup_lts.x
+#            which always resolves to the current Active LTS major
+#            (in May 2026 that is 24 'Krypton'; in Oct 2026 it will become 26).
+#   "22", "24", ... -> pin to a specific major when an app needs to match a
+#            dev environment exactly.
+# Track the schedule at https://github.com/nodejs/Release  (active LTS column).
+NODEVER=lts
 INSTALLPWD=`pwd`
 
 # --------------------------------------------------------------------------
