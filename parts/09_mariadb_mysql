@@ -41,7 +41,7 @@ if [ ! "$domysql" = "n" ]; then
       echo -n "Enter a new mysql (mariadb) root password (cannot be empty) =>" && read mysqlpwd
     done
   fi
-
+  echo "Hardening mariaDB - remove anonymous users, disallow remote login, drop test databases"
   # Use a HEREDOC piped into mariadb. Note the SQL escaping of the underscore
   # in 'test\_%' so it is treated as a literal underscore in the LIKE pattern.
   mariadb -u root <<-SQL
@@ -57,7 +57,7 @@ if [ ! "$domysql" = "n" ]; then
 	DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 	FLUSH PRIVILEGES;
 	SQL
-
+ echo "Hardening mariaDB - done"	
 fi
 
 logline "09.99 mariadb END"
