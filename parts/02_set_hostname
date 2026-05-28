@@ -28,7 +28,7 @@ EOF
 #
 # You can also pre-seed any of these from the environment to make the run
 # fully hands-off, e.g.
-#     rootpas=n timezone=Europe/Amsterdam donode=y domysql=y \
+#     rootpas=n timezone=Europe/Amsterdam docowsay=y donode=y domysql=y \
 #     doredis=y dolaravelwebsite=n ./setup_full
 # --------------------------------------------------------------------------
 logline "02.50 pre-asking optional install questions"
@@ -41,6 +41,9 @@ echo -n "Do you want a long secure root password (l) or no password at all (n) [
 
 # Timezone (consumed by parts/06_global_settings) - blank = UTC
 echo -n "What timezone do you want (enter for UTC) =>" && read timezone
+
+# Fortune + cowsay banner in the user's .bashrc (consumed by parts/06_global_settings)
+echo -n "Install fortune+cowsay banner on login (just for fun) [Y/n]=>" && read docowsay
 
 # Node/npm/pnpm (consumed by parts/08_node_npm)
 echo -n "Node/nvm/npm is optional. Install  [Y/n]=>" && read donode

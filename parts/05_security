@@ -6,33 +6,62 @@ logline "05.00 security"
 
 logline "05.01 ssh security"
 
-sshtemp=`mktemp`
-cat /etc/ssh/sshd_config | sed -e "s/PasswordAuthentication yes/PasswordAuthentication no/" >$sshtemp
+# All sshd hardening lives in a single drop-in file. On Debian 12+ the stock
+# /etc/ssh/sshd_config starts with `Include /etc/ssh/sshd_config.d/*.conf`,
+# and sshd uses FIRST-occurrence-wins, so any setting we put here will
+# authoritatively beat whatever is later in the main config, in any other
+# drop-in (e.g. cloud-init's 50-cloud-init.conf which re-enables
+# PasswordAuthentication on cloud images), or in any package update of
+# sshd_config itself.
+#
+# We use the 00- prefix so this file is read FIRST (alphabetical glob order)
+# and therefore wins the first-wins race against any 50-cloud-init.conf etc.
+mkdir -p /etc/ssh/sshd_config.d
+cat <<-'EOF' >/etc/ssh/sshd_config.d/00-hardening.conf
+	# managed by debian-laravel-stack/parts/05_security - do not edit by hand
+	# Loaded before any other drop-in, so these values win.
 
-cat <<-'EOF' >>$sshtemp
-	PermitRootLogin no
-	Protocol 2
-	UsePrivilegeSeparation yes
-	SyslogFacility AUTH
-	LogLevel INFO
-	StrictModes yes
+	# --- authentication ---------------------------------------------------
+	PasswordAuthentication no
 	PubkeyAuthentication yes
-	IgnoreRhosts yes
-	HostbasedAuthentication no
+	PermitRootLogin no
 	PermitEmptyPasswords no
+	HostbasedAuthentication no
+	IgnoreRhosts yes
+	StrictModes yes
+	# allow older ssh clients to connect (e.g. dbeaver) by re-enabling ssh-rsa
+	PubkeyAcceptedKeyTypes +ssh-rsa
+
+	# --- networking / forwarding ------------------------------------------
 	X11Forwarding no
 	GatewayPorts no
-	PrintMotd no
 	TCPKeepAlive yes
-	PasswordAuthentication no
-	# allow older ssh clients to connect (dbeaver)
-    PubkeyAcceptedKeyTypes +ssh-rsa
+
+	# --- logging ----------------------------------------------------------
+	SyslogFacility AUTH
+	LogLevel INFO
+
+	# --- ux ---------------------------------------------------------------
+	PrintMotd no
+
+	# --- deprecated / removed in modern OpenSSH (kept here as history) ----
+	# Protocol 2                   # removed in OpenSSH 7.6 - only protocol 2 is supported
+	# UsePrivilegeSeparation yes   # removed in OpenSSH 7.5 - privsep is always on
 EOF
-mv -f $sshtemp /etc/ssh/sshd_config
-# only readable by root
-chmod 0600 /etc/ssh/sshd_config
+chmod 0644 /etc/ssh/sshd_config.d/00-hardening.conf
+
+# Validate the merged config BEFORE restarting, otherwise we may lock ourselves out.
+sshd -t
+
 # and reboot the service
 systemctl restart ssh.service
+
+# Confirm what sshd is actually using at runtime (sshd -T prints the
+# *effective* config after all Includes/drop-ins are merged). If any of
+# these lines does not say what we expect, something is overriding us.
+echo "---- effective sshd settings ----"
+sshd -T | grep -iE '^(passwordauthentication|permitrootlogin|permitemptypasswords|pubkeyauthentication|x11forwarding|gatewayports)\b'
+echo "---------------------------------"
 
 
 logline "05.02 firewall"
@@ -56,11 +85,15 @@ ufw status verbose
 
 logline "05.03 fail2ban aggressive sshd protection"
 apt install -y fail2ban
+# - maxretry/findtime: 3 failed attempts within 10 minutes -> ban
+# - bantime  1w       : keep them out for a week (was 1 day)
+# - mode = aggressive : matches more patterns (probe-style scans, not just auth failures)
 cat <<-'EOF' >/etc/fail2ban/jail.local
 	[sshd]
 	enabled = true
 	maxretry = 3
-	bantime = 86400
+	findtime = 10m
+	bantime = 1w
 	mode = aggressive
 EOF
 systemctl start fail2ban
@@ -71,6 +104,44 @@ fail2ban-client status
 
 # Check specific jail
 fail2ban-client status sshd
+
+# --------------------------------------------------------------------------
+logline "05.04 CrowdSec - community-driven IPS (complements fail2ban)"
+# --------------------------------------------------------------------------
+# CrowdSec = log parser + decision engine. The "bouncer" is the thing that
+# actually blocks (we use the nftables bouncer, which is the modern default on
+# Debian 12+ and works alongside ufw without conflict).
+#
+# Both crowdsec and fail2ban can run side by side; they ban via different
+# tables/chains. CrowdSec also pulls a community blocklist daily, so you
+# benefit from IPs already flagged by other CrowdSec users worldwide.
+
+# Add the official CrowdSec apt repo (packagecloud). Idempotent: re-running
+# the install script is safe.
+curl -fsSL https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh \
+	| DEBIAN_FRONTEND=noninteractive bash
+
+# Install daemon + nftables bouncer non-interactively
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt install -y \
+	-o Dpkg::Options::="--force-confdef" \
+	-o Dpkg::Options::="--force-confold" \
+	crowdsec crowdsec-firewall-bouncer-nftables
+
+# Enable + start both services
+systemctl enable --now crowdsec
+systemctl enable --now crowdsec-firewall-bouncer
+
+# Show a quick sanity overview. Parsers/scenarios for sshd ship by default,
+# and the community blocklist starts populating within minutes.
+cscli metrics || true
+cscli decisions list || true
+
+# Optional manual follow-up (not required for protection to work):
+#   - Enroll this machine in the web console for a dashboard:
+#       cscli console enroll <YOUR_KEY>          # get key at https://app.crowdsec.net
+#   - Add extra collections (e.g. for nginx) once you have a site live:
+#       cscli collections install crowdsecurity/nginx
+#       systemctl reload crowdsec
 
 logline "05.99 security END"
 

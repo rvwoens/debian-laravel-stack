@@ -30,23 +30,31 @@ apt install -y python3 python3-pip python3-dev python3-venv
 # make sure there is 'python' (not only python3)
 apt install python-is-python3
 
-### yum fortune and cowsay
-logline "06.04 install fortune and cowsay"
-# fortune is now a python app (fortune-mod is no longer distributed and a pain to cmake)
-# pip3 install fortune
-apt install -y fortune-mod
-#git clone https://github.com/bmc/fortunes.git /usr/local/share/fortunes
-#yum -y install cowsay
-# need to install from source..
+### fortune and cowsay (just for fun on login)
+# $docowsay is normally pre-asked in parts/02_set_hostname so this part can run
+# unattended. Fall back to prompting here when the script is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default "yes") is NOT re-prompted.
+if [ -z "${docowsay+set}" ]; then
+	echo -n "Install fortune+cowsay banner on login (just for fun) [Y/n]=>" && read docowsay
+fi
+if [ ! "$docowsay" = "n" ]; then
+	logline "06.04 install fortune and cowsay"
+	# fortune is now a python app (fortune-mod is no longer distributed and a pain to cmake)
+	# pip3 install fortune
+	apt install -y fortune-mod
+	#git clone https://github.com/bmc/fortunes.git /usr/local/share/fortunes
+	#yum -y install cowsay
+	# need to install from source..
 
-cd /usr/local/src
-git clone https://github.com/schacon/cowsay.git
-cd cowsay
-# install.sh prompts for a target directory; piping a newline accepts the default
-# (use `yes "" | sh install.sh` if it ever grows additional prompts)
-echo | sh install.sh
-cd $INSTALLPWD
-su - $username -c 'echo "fortune | cowsay -W 100 -f small" >> ~/.bashrc'
+	cd /usr/local/src
+	git clone https://github.com/schacon/cowsay.git
+	cd cowsay
+	# install.sh prompts for a target directory; piping a newline accepts the default
+	# (use `yes "" | sh install.sh` if it ever grows additional prompts)
+	echo | sh install.sh
+	cd $INSTALLPWD
+	su - $username -c 'echo "fortune | cowsay -W 100 -f small" >> ~/.bashrc'
+fi
 
 logline "06.05 additional installs"
 apt install -y rsync
