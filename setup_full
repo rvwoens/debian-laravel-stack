@@ -22,14 +22,42 @@ fi
 echo "##########################################################"
 echo "FULL setup ready"
 echo "##########################################################"
-echo "Need to reboot to check if everything comes up as expected."
-echo "Then login as $username, not as root! Press a key to reboot"
 myip=`curl -4 -s ifconfig.me`
-echo "after rebooting you could try http://$myip "
-read
-# reboot
-# shutdown -r now
-systemctl reboot
+echo "After reboot:"
+echo "  - log in as $username   (NOT as root)"
+echo "  - try   http://$myip"
+echo ""
+echo "Reboot now? (Y/n)"
+echo ""
+echo "NOTE (Linode / KVM): if a previous 'systemctl reboot' left this VM"
+echo "  in the 'Powered Off' state instead of restarting, either:"
+echo "    a) enable 'Lassie' (Shutdown Watchdog) in the Linode Cloud Manager"
+echo "       under: Linodes -> <your linode> -> Settings -> Shutdown Watchdog"
+echo "    b) skip this reboot (answer n) and click Reboot in the Cloud Manager"
+echo "  The escalation ladder below also helps -- it falls back from"
+echo "  graceful -> --force -> SysRq hard reset if a step stalls."
+echo ""
+read doreboot
+if [ "$doreboot" = "n" ] || [ "$doreboot" = "N" ]; then
+	echo "Skipping reboot. You can do it later with:"
+	echo "    sudo systemctl reboot --force"
+	exit 0
+fi
+
+# Flush dirty buffers first so the immediate-reboot below cannot leave
+# the filesystems in a half-written state.
+sync && sync
+
+# Reboot NOW - no escalator, no sleeps. `systemctl reboot --force --force`
+# is the most immediate clean-ish reboot:
+#   - skips the service-stop dance (which is what hangs on Linode/KVM)
+#   - does NOT contact pid1 -- systemctl itself calls the kernel reboot()
+#     syscall directly, so it works even if systemd has wedged
+#   - the connection drops immediately (sshd dies with everything else)
+# If for any reason this STILL leaves the VM hanging, the right fix is to
+# reboot from the Linode Lish console (or hit Reboot in the Cloud Manager).
+echo ">>>> rebooting NOW (systemctl reboot --force --force)"
+systemctl reboot --force --force
 
 
 
