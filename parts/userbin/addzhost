@@ -8,8 +8,6 @@ if [ -z "$2" ]; then
  	echo "3) creates puller to pull from git repo <pull-repo>"
 	echo "4) checks out <initial-tag> as first release or asks you"
 	echo "USE FULL DOMAIN like xxyy.nl or asd.com"
-	echo "USE remote repo ssh clone address - make sure this server id_rsa.pub has access to an account that can read the repo"
-	echo "OR USE https://github.com/user/repo.git - will do a simple clone"
 	echo "Dont forget to edit the .env on the top directory!"
 	exit;
 fi
@@ -47,6 +45,190 @@ if [[ "$GITREPO" =~ ^https://github.com ]]; then
 else
   GITHUB_SIMPLE_REPO=N
 fi
+
+# ----------------------------------------------------------------------
+# Test that we can actually reach $GITREPO BEFORE we create any directory
+# or generate any script. The most common addzhost failure is that this
+# server's public key has not yet been added as a deploy key on the git
+# remote -- testing here means we can show that pubkey and let the user
+# add it before we touch anything.
+#
+# `git ls-remote --exit-code <url> HEAD` is read-only, works for both
+# ssh:// (git@...) and https:// remotes, and returns non-zero on any
+# access failure. We force `BatchMode=yes` on the ssh side so it fails
+# immediately instead of hanging on a passphrase / password prompt, and
+# `StrictHostKeyChecking=accept-new` so we trust github/gitlab on first
+# contact (with a warning if the key changes later).
+# ----------------------------------------------------------------------
+# Pick the pubkey we will offer / upload (prefer ed25519 over rsa).
+if [ -f ~/.ssh/id_ed25519.pub ]; then
+	MYPUBKEY=~/.ssh/id_ed25519.pub
+elif [ -f ~/.ssh/id_rsa.pub ]; then
+	MYPUBKEY=~/.ssh/id_rsa.pub
+else
+	MYPUBKEY=""
+fi
+
+# ----------------------------------------------------------------------
+# detect_provider <git-url>
+#   Sets PROVIDER (github|gitlab|other) and OWNERREPO (owner/repo) from
+#   either an ssh url (git@host:owner/repo.git) or an https url
+#   (https://host/owner/repo[.git]).
+# ----------------------------------------------------------------------
+detect_provider() {
+	local url="$1"
+	PROVIDER=other
+	OWNERREPO=""
+	# strip optional trailing .git
+	local stripped="${url%.git}"
+	if [[ "$stripped" =~ ^git@([^:]+):(.+)$ ]]; then
+		local host="${BASH_REMATCH[1]}"
+		OWNERREPO="${BASH_REMATCH[2]}"
+		case "$host" in
+			github.com)  PROVIDER=github ;;
+			gitlab.com)  PROVIDER=gitlab ;;
+			gitlab*)     PROVIDER=gitlab ;; # self-hosted gitlab.example.com etc.
+			github*)     PROVIDER=github ;;
+		esac
+	elif [[ "$stripped" =~ ^https?://([^/]+)/(.+)$ ]]; then
+		local host="${BASH_REMATCH[1]}"
+		OWNERREPO="${BASH_REMATCH[2]}"
+		case "$host" in
+			github.com)  PROVIDER=github ;;
+			gitlab.com)  PROVIDER=gitlab ;;
+			gitlab*)     PROVIDER=gitlab ;;
+			github*)     PROVIDER=github ;;
+		esac
+	fi
+}
+
+# ----------------------------------------------------------------------
+# try_autoadd_deploykey
+#   Detects gh / glab; if installed AND authenticated for the right
+#   provider, offers to add $MYPUBKEY as a deploy key on the remote repo.
+#   Returns 0 on success (key added), non-zero otherwise (so caller can
+#   fall back to the manual paste flow).
+# ----------------------------------------------------------------------
+try_autoadd_deploykey() {
+	[ -n "$MYPUBKEY" ] || return 1
+	detect_provider "$GITREPO"
+	[ -n "$OWNERREPO" ] || return 1
+	local title="$(hostname)-$(basename "$WWWSITE")"
+
+	case "$PROVIDER" in
+		github)
+			command -v gh >/dev/null 2>&1 || return 1
+			# `gh auth status` returns 0 only when authenticated for github.com.
+			# If not authenticated, offer to run the interactive login flow.
+			# `gh auth login --web` prints a one-time code + URL the user opens
+			# in any browser (works fine over SSH; the server itself does not
+			# need a browser). --git-protocol ssh matches our ssh git remote.
+			if ! gh auth status >/dev/null 2>&1; then
+				echo "!! gh CLI is installed but not authenticated for github.com."
+				echo -n "Run 'gh auth login' now to authenticate? [Y/n] >" && read yn
+				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
+				gh auth login --hostname github.com --git-protocol ssh --web || true
+				# Re-check; if the login was cancelled, fall back to manual.
+				if ! gh auth status >/dev/null 2>&1; then
+					echo "!! still not authenticated - falling back to manual paste flow"
+					return 1
+				fi
+				echo ">>>> gh is now authenticated."
+			fi
+			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on github.com/$OWNERREPO ? [Y/n] >" && read yn
+			if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
+			# gh repo deploy-key add <key-file> --title <t> -R owner/repo
+			# (no --allow-write flag means read-only, which is what we want)
+			if gh repo deploy-key add "$MYPUBKEY" --title "$title" -R "$OWNERREPO"; then
+				echo ">>>> Deploy key uploaded to github.com/$OWNERREPO"
+				return 0
+			fi
+			echo "!! gh failed to add the deploy key (already exists?)"
+			return 1
+			;;
+		gitlab)
+			command -v glab >/dev/null 2>&1 || return 1
+			# Same pattern as gh above: if installed but not authenticated for
+			# the matching host, offer to run the interactive login. We pass
+			# --hostname explicitly so self-hosted GitLab works too.
+			# glab auth login is interactive (browser / token); over SSH the
+			# browser flow shows a one-time code the user opens in any browser.
+			local glab_host=gitlab.com
+			# Re-detect the hostname for self-hosted gitlabs from $GITREPO.
+			if [[ "$GITREPO" =~ ^git@([^:]+): ]]; then
+				glab_host="${BASH_REMATCH[1]}"
+			elif [[ "$GITREPO" =~ ^https?://([^/]+)/ ]]; then
+				glab_host="${BASH_REMATCH[1]}"
+			fi
+			if ! glab auth status --hostname "$glab_host" >/dev/null 2>&1; then
+				echo "!! glab CLI is installed but not authenticated for $glab_host."
+				echo -n "Run 'glab auth login --hostname $glab_host' now to authenticate? [Y/n] >" && read yn
+				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
+				glab auth login --hostname "$glab_host" || true
+				if ! glab auth status --hostname "$glab_host" >/dev/null 2>&1; then
+					echo "!! still not authenticated - falling back to manual paste flow"
+					return 1
+				fi
+				echo ">>>> glab is now authenticated for $glab_host."
+			fi
+			echo -n "Auto-add this server's pubkey as a read-only Deploy Key on $OWNERREPO ? [Y/n] >" && read yn
+			if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
+			# glab deploy-key add <key-file> --title <t> -R group/repo
+			# (no --can-push flag means read-only)
+			if glab deploy-key add "$MYPUBKEY" --title "$title" -R "$OWNERREPO"; then
+				echo ">>>> Deploy key uploaded to $OWNERREPO"
+				return 0
+			fi
+			echo "!! glab failed to add the deploy key (already exists?)"
+			return 1
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+echo ">>>> Testing git repository access: $GITREPO"
+while true; do
+	if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+		git ls-remote --exit-code "$GITREPO" HEAD >/dev/null 2>&1; then
+		echo ">>>> repo access OK"
+		break
+	fi
+	echo ""
+	echo "!! Could not reach $GITREPO"
+
+	# Best path first: if gh/glab is installed AND authenticated, offer to
+	# add the deploy key in one step. On success we loop back and retest.
+	if try_autoadd_deploykey; then
+		echo ">>>> retrying repo access..."
+		continue
+	fi
+
+	echo "!! Manual fallback: add the following public key as a Deploy Key on the repo:"
+	echo "!!   GitLab : Project -> Settings -> Repository -> Deploy keys -> Add deploy key"
+	echo "!!   GitHub : Repo    -> Settings -> Deploy keys             -> Add deploy key"
+	echo "!! (read-only is enough for pulling; tick 'write' only if puller needs to push)"
+	echo "!! Tip: authenticate gh/glab once to let addzhost auto-add this next time:"
+	echo "!!   gh   auth login                                (for github.com)"
+	echo "!!   glab auth login --hostname gitlab.com          (for gitlab.com / self-hosted: use your host)"
+	echo ""
+	if [ -n "$MYPUBKEY" ]; then
+		echo "------ $MYPUBKEY ------------------------------------"
+		cat "$MYPUBKEY"
+		echo "-----------------------------------------------------------------"
+	else
+		echo "!! No public key found in ~/.ssh/ - generate one first with:"
+		echo "!!   ssh-keygen -t ed25519 -C \"$USER@$(hostname)\""
+	fi
+	echo ""
+	echo -n "R) Retry  S) Stop  C) Continue anyway [R/s/c] >" && read retry
+	case "$retry" in
+		s|S) echo "Stopped."; exit 1 ;;
+		c|C) echo "Continuing despite git access failure - puller will likely fail later"; break ;;
+		*) ;; # anything else (incl. just Enter) = retry
+	esac
+done
 
 echo "Laravel app    at: $WWWSITE"
 echo "Git repository at: $GITREPO"
@@ -171,12 +353,12 @@ else
 			echo "Rolled back"
 			exit 1
 			;;
-		C)
-			echo "Continue"
-			;;
 		S|*)
 			echo "Stop"
 			exit 1
+			;;
+		C)
+			echo "Continue"
 			;;
 	esac
 fi

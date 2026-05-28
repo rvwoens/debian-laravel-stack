@@ -43,8 +43,62 @@ echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.
 # Update
 apt update
 
-logline "03.96 add gh command to git for push to github (origin)"
-git config --global alias.gh '!f() { git add -A && git commit -m "${@:-incremental}" && git push; }; f'
+logline "03.06 GitHub CLI (gh) - official cli.github.com repo"
+# Use the official upstream repo per
+#   https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+# We avoid Debian's community 'gh' package - upstream notes (Nov 2025) that
+# the community 2.45.x / 2.46.x is broken against current GitHub APIs.
+mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+	| tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+	> /etc/apt/sources.list.d/github-cli.list
+apt update
+DEBIAN_FRONTEND=noninteractive apt install -y gh
+echo "Installed: $(gh --version | head -n1)"
+
+logline "03.07 GitLab CLI (glab) - latest static binary from gitlab.com upstream"
+# We fetch the upstream static Go binary because:
+#  - Debian 12 (Bookworm) does NOT ship glab at all
+#  - Debian 13 (Trixie) only ships v1.53 (often months behind)
+# The release tarball is self-contained, so a direct install is reliable.
+apt install -y jq
+# Note: 'arch' here is Debian's vocabulary (amd64, arm64, armhf, ...). The
+# upstream glab tarballs use either the new _linux_amd64.tar.gz naming or the
+# older _Linux_x86_64.tar.gz, so we grep for either.
+glab_arch=$(dpkg --print-architecture)
+glab_url=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest" \
+	| jq -r '.assets.links[].url' \
+	| grep -E "_(linux|Linux)_(${glab_arch}|x86_64)\.tar\.gz$" \
+	| head -n1)
+if [ -n "$glab_url" ]; then
+	glab_tmp=$(mktemp -d)
+	curl -fsSL "$glab_url" | tar -xzC "$glab_tmp"
+	# Modern tarballs ship bin/glab; older ones put the binary at the top
+	# level. Find it either way.
+	glab_bin=$(find "$glab_tmp" -type f -name glab -perm -u+x | head -n1)
+	if [ -n "$glab_bin" ]; then
+		install -m 0755 "$glab_bin" /usr/local/bin/glab
+		echo "Installed: $(/usr/local/bin/glab --version | head -n1)"
+	else
+		echo "!! glab binary not found inside tarball - skipping"
+	fi
+	rm -rf "$glab_tmp"
+else
+	echo "!! could not determine latest glab binary url for arch=$glab_arch - skipping"
+fi
+
+# Authentication note (informational, not done here because it is per-user):
+#   gh auth login            # stores token in ~/.config/gh/
+#   glab auth login          # stores token in ~/.config/glab-cli/config.yml
+# Both are needed before addzhost can auto-add a deploy key on your behalf.
+
+# obsolete
+#logline "03.96 add 'gh' git alias for quick commit+push to origin"
+# This is a GIT alias 'git gh' (add+commit+push), totally unrelated to the
+# GitHub CLI binary 'gh' installed above; they coexist without conflict.
+#git config --global alias.gh '!f() { git add -A && git commit -m "${@:-incremental}" && git push; }; f'
 
 
 logline "03.99 basic packages END"
