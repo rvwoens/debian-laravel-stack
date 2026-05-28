@@ -110,14 +110,44 @@ detect_provider() {
 #   fall back to the manual paste flow).
 # ----------------------------------------------------------------------
 try_autoadd_deploykey() {
-	[ -n "$MYPUBKEY" ] || return 1
+	# Each early-return below tells the user WHY auto-add was skipped, so it
+	# is obvious what to fix instead of dropping straight to the manual flow.
+	if [ -z "$MYPUBKEY" ]; then
+		echo "!! auto-add skipped: no ssh public key found in ~/.ssh/ (id_ed25519.pub / id_rsa.pub)"
+		return 1
+	fi
 	detect_provider "$GITREPO"
-	[ -n "$OWNERREPO" ] || return 1
+	if [ -z "$OWNERREPO" ]; then
+		echo "!! auto-add skipped: could not parse owner/repo from \$GITREPO=$GITREPO"
+		echo "!!   expected forms: git@HOST:OWNER/REPO.git   or   https://HOST/OWNER/REPO[.git]"
+		return 1
+	fi
+	if [ "$PROVIDER" = "other" ]; then
+		echo "!! auto-add skipped: host in \$GITREPO is neither github* nor gitlab* (no CLI to use)"
+		return 1
+	fi
 	local title="$(hostname)-$(basename "$WWWSITE")"
 
 	case "$PROVIDER" in
 		github)
-			command -v gh >/dev/null 2>&1 || return 1
+			if ! command -v gh >/dev/null 2>&1; then
+				echo "!! auto-add skipped: gh (GitHub CLI) is not installed on this server"
+				echo -n "Install gh now via apt? (needs sudo) [Y/n] >" && read yn
+				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
+				# Use the official upstream apt repo (Debian's community gh is
+				# noted as broken against current github APIs).
+				sudo mkdir -p -m 755 /etc/apt/keyrings
+				curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+					| sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+				sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+				echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+					| sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+				sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y gh
+				if ! command -v gh >/dev/null 2>&1; then
+					echo "!! gh install failed - falling back to manual"
+					return 1
+				fi
+			fi
 			# `gh auth status` returns 0 only when authenticated for github.com.
 			# If not authenticated, offer to run the interactive login flow.
 			# `gh auth login --web` prints a one-time code + URL the user opens
@@ -147,7 +177,38 @@ try_autoadd_deploykey() {
 			return 1
 			;;
 		gitlab)
-			command -v glab >/dev/null 2>&1 || return 1
+			if ! command -v glab >/dev/null 2>&1; then
+				echo "!! auto-add skipped: glab (GitLab CLI) is not installed on this server"
+				echo -n "Install glab now (download upstream .deb)? (needs sudo) [Y/n] >" && read yn
+				if [ "$yn" = "n" ] || [ "$yn" = "N" ]; then return 1; fi
+				# Same install recipe as parts/03_basic_packages step 03.07.
+				sudo apt install -y jq
+				local _arch=$(dpkg --print-architecture)
+				# Map Debian arch name to glab asset arch label.
+				local _asset_arch
+				case "$_arch" in
+					i386)    _asset_arch=386     ;;
+					armhf)   _asset_arch=armv6   ;;
+					ppc64el) _asset_arch=ppc64le ;;
+					*)       _asset_arch="$_arch" ;;
+				esac
+				local _url=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest" \
+					| jq -r --arg name "_linux_${_asset_arch}.deb" \
+						'.assets.links[] | select(.name | endswith($name)) | .direct_asset_url' \
+					| head -n1)
+				if [ -z "$_url" ]; then
+					echo "!! could not find a glab .deb for arch=$_arch (asset arch=$_asset_arch) - falling back to manual"
+					return 1
+				fi
+				local _tmp=$(mktemp --suffix=.deb)
+				curl -fsSL "$_url" -o "$_tmp"
+				sudo DEBIAN_FRONTEND=noninteractive apt install -y "$_tmp"
+				rm -f "$_tmp"
+				if ! command -v glab >/dev/null 2>&1; then
+					echo "!! glab install failed - falling back to manual"
+					return 1
+				fi
+			fi
 			# Same pattern as gh above: if installed but not authenticated for
 			# the matching host, offer to run the interactive login. We pass
 			# --hostname explicitly so self-hosted GitLab works too.

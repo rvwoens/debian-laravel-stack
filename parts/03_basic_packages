@@ -58,35 +58,46 @@ apt update
 DEBIAN_FRONTEND=noninteractive apt install -y gh
 echo "Installed: $(gh --version | head -n1)"
 
-logline "03.07 GitLab CLI (glab) - latest static binary from gitlab.com upstream"
-# We fetch the upstream static Go binary because:
+logline "03.07 GitLab CLI (glab) - latest .deb from gitlab.com upstream"
+# We fetch the upstream Debian package because:
 #  - Debian 12 (Bookworm) does NOT ship glab at all
 #  - Debian 13 (Trixie) only ships v1.53 (often months behind)
-# The release tarball is self-contained, so a direct install is reliable.
+# Upstream now publishes proper .deb files per release; `apt install ./X.deb`
+# resolves any deps automatically and integrates with dpkg/apt for upgrades.
 apt install -y jq
-# Note: 'arch' here is Debian's vocabulary (amd64, arm64, armhf, ...). The
-# upstream glab tarballs use either the new _linux_amd64.tar.gz naming or the
-# older _Linux_x86_64.tar.gz, so we grep for either.
+
+# Map Debian arch names to the labels glab uses in its release asset names.
+#   Debian   -> glab asset
+#   amd64    -> amd64       (same)
+#   arm64    -> arm64       (same)
+#   s390x    -> s390x       (same)
+#   i386     -> 386
+#   armhf    -> armv6
+#   ppc64el  -> ppc64le
 glab_arch=$(dpkg --print-architecture)
+case "$glab_arch" in
+	i386)    glab_asset_arch=386     ;;
+	armhf)   glab_asset_arch=armv6   ;;
+	ppc64el) glab_asset_arch=ppc64le ;;
+	*)       glab_asset_arch="$glab_arch" ;;
+esac
+
+# Each asset link has a plain `.name` (e.g. glab_1.100.0_linux_amd64.deb) and
+# a percent-encoded `.url`. Filter on `.name` to keep the jq query simple and
+# use `.direct_asset_url` (the human-readable URL) for the download.
 glab_url=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest" \
-	| jq -r '.assets.links[].url' \
-	| grep -E "_(linux|Linux)_(${glab_arch}|x86_64)\.tar\.gz$" \
+	| jq -r --arg name "_linux_${glab_asset_arch}.deb" \
+		'.assets.links[] | select(.name | endswith($name)) | .direct_asset_url' \
 	| head -n1)
 if [ -n "$glab_url" ]; then
-	glab_tmp=$(mktemp -d)
-	curl -fsSL "$glab_url" | tar -xzC "$glab_tmp"
-	# Modern tarballs ship bin/glab; older ones put the binary at the top
-	# level. Find it either way.
-	glab_bin=$(find "$glab_tmp" -type f -name glab -perm -u+x | head -n1)
-	if [ -n "$glab_bin" ]; then
-		install -m 0755 "$glab_bin" /usr/local/bin/glab
-		echo "Installed: $(/usr/local/bin/glab --version | head -n1)"
-	else
-		echo "!! glab binary not found inside tarball - skipping"
-	fi
-	rm -rf "$glab_tmp"
+	glab_tmp=$(mktemp --suffix=.deb)
+	curl -fsSL "$glab_url" -o "$glab_tmp"
+	# apt install (not dpkg -i) so any deps get pulled in automatically.
+	DEBIAN_FRONTEND=noninteractive apt install -y "$glab_tmp"
+	rm -f "$glab_tmp"
+	echo "Installed: $(glab --version | head -n1)"
 else
-	echo "!! could not determine latest glab binary url for arch=$glab_arch - skipping"
+	echo "!! could not find a glab .deb for arch=$glab_arch (asset arch=$glab_asset_arch) - skipping"
 fi
 
 # Authentication note (informational, not done here because it is per-user):
