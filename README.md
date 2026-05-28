@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-2.0.09-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-2.0.10-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -42,8 +42,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.09.tar.gz | tar -xz
-cd debian-laravel-stack-2.0.09
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.10.tar.gz | tar -xz
+cd debian-laravel-stack-2.0.10
 ./setup_full
 ```
 
@@ -55,10 +55,10 @@ Log in as the default (created) user and run
     addzhost <<domain>> <<git repository>> <<initial tag>>
 ```
 
-### Note:
-You need access privileges from this server on the repository.
-- there are 2 tools: ```gitlab-auth``` and ```github-auth`` which will give API access from this server to place keys automatically
-- Alternatively add the contents of ```~/.ssh/id_ed25519.pub``` to allow github/lab deployments
+> **Note:**
+>You need access privileges from this server on the repository.
+> - there are 2 tools: ```gitlab-auth``` and ```github-auth``` which will give API access from this server to place keys automatically
+> - Alternatively add the contents of ```~/.ssh/id_ed25519.pub``` to allow github/lab deployments
 
 ### Directory structure
 The zero downtime deployment creates the following directory structure for each app:
