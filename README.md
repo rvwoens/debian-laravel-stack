@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-2.0.07-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-2.0.08-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -10,13 +10,18 @@
 [![Node version](https://img.shields.io/badge/Node-24-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Redis version](https://img.shields.io/badge/Redis-6.x%207.x%208.x-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Laravel version](https://img.shields.io/badge/Laravel-v5%20v6%20v7%20v8%20v9%20v10%20v11%20v12-blue)](https://github.com/rvwoens/Debian-laravel-stack)
-* Debian
+* Install standard Debian packages and latest upgrades / updates
+* Security and Hardening (fail2ban, firewall, strict sshd)
+* create a standard user with sudo
+* gitlab and github tools
+
+### All other installs are optional:
 * Nginx and virtual hosts, including Certbot SSL setup
 * Php fpm & cli, composer, common php packages.
-* Nvm, Node, npm, yarn
+* Nvm, Node, npm, yarn, pnpm
+* MariaDB
 * Redis
-* Security and Hardening (fail2ban, firewall, strict sshd)
-* Add (multiple) Laravel projects (any Laravel version) with Zero-Downtime deployment
+* Add (multiple) Laravel projects (any Laravel version) with fast Zero-Downtime deployment
 
 The scripts are all bash, and kept very simple so you can tweak them to your needs if you want to. 
 No overengineered docker shit, superfast deployments without container builds. A simple git pull does the trick.
@@ -37,8 +42,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.07.tar.gz | tar -xz
-cd debian-laravel-stack-2.0.07
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.08.tar.gz | tar -xz
+cd debian-laravel-stack-2.0.08
 ./setup_full
 ```
 

@@ -57,7 +57,7 @@ request_letsencrypt_cert() {
 	# would otherwise fail the HTTP-01 challenge on www.* and abort the
 	# WHOLE issuance, leaving us with no cert at all.
 	echo "Include www.$servername in the certificate as well? (Y/n)"
-	echo "   (answer N if www.$servername has no DNS record pointing here)"
+	#echo "   (answer N if www.$servername has no DNS record pointing here)"
 	local dowww
 	read dowww
 	local include_www=1
