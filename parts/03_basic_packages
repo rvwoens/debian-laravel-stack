@@ -18,7 +18,17 @@ logline "03.00 basic packages"
 # yum -q repolist
 
 logline "03.03 update system - this can take a while.."
-DEBIAN_FRONTEND=noninteractive apt update && apt upgrade -y
+# Use full-upgrade (== dist-upgrade) instead of upgrade so we don't silently
+# hold back package transitions (kernel ABI bumps, library SO-name changes,
+# package renames). DEBIAN_FRONTEND / NEEDRESTART_MODE are exported in
+# parts/00_settings; APT_CONF_OPTS keeps config-file conflicts non-interactive
+# by defaulting to the existing local copy.
+apt update
+apt full-upgrade -y "${APT_CONF_OPTS[@]}"
+# Drop packages no longer needed by anything (e.g. old kernel images) and
+# free the apt cache.
+apt autoremove -y --purge
+apt clean
 
 logline "03.04 apt some sysop and dev tools"
 apt install -qq -y htop iotop ncdu pv unzip build-essential autoconf automake git 
@@ -55,7 +65,7 @@ chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
 	> /etc/apt/sources.list.d/github-cli.list
 apt update
-DEBIAN_FRONTEND=noninteractive apt install -y gh
+apt install -y gh   # DEBIAN_FRONTEND inherited from parts/00_settings
 echo "Installed: $(gh --version | head -n1)"
 
 logline "03.07 GitLab CLI (glab) - latest .deb from gitlab.com upstream"
@@ -93,7 +103,8 @@ if [ -n "$glab_url" ]; then
 	glab_tmp=$(mktemp --suffix=.deb)
 	curl -fsSL "$glab_url" -o "$glab_tmp"
 	# apt install (not dpkg -i) so any deps get pulled in automatically.
-	DEBIAN_FRONTEND=noninteractive apt install -y "$glab_tmp"
+	# DEBIAN_FRONTEND inherited from parts/00_settings
+	apt install -y "$glab_tmp"
 	rm -f "$glab_tmp"
 	echo "Installed: $(glab --version | head -n1)"
 else

@@ -18,3 +18,18 @@ PHPVER=8.3
 NODEVER=24
 INSTALLPWD=`pwd`
 
+# --------------------------------------------------------------------------
+# Apt non-interactivity (exported so every sourced part + every subprocess
+# inherits it):
+#   DEBIAN_FRONTEND=noninteractive  -> debconf never shows TUI dialogs
+#   NEEDRESTART_MODE=a              -> needrestart auto-restarts services
+#                                      (Debian 12+); ignored on older systems
+# APT_CONF_OPTS is a bash array that should be passed to every apt invocation
+# that might trigger config-file conflicts (typically full-upgrade and
+# upgrades of services with /etc/<pkg>.conf files). Usage:
+#     apt install -y "${APT_CONF_OPTS[@]}" some-package
+# --------------------------------------------------------------------------
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+APT_CONF_OPTS=(-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+

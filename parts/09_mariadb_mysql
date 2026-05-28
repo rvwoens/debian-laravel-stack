@@ -13,15 +13,11 @@ if [ ! "$domysql" = "n" ]; then
 
   logline "09.01 apt mariadb"
 
-  # Make the apt install completely non-interactive:
-  #  - DEBIAN_FRONTEND=noninteractive  -> never show debconf TUI dialogs
-  #  - NEEDRESTART_MODE=a              -> auto-restart services (Debian 12+)
-  #  - --force-confdef / --force-confold -> on package config conflicts, keep
-  #    the existing config and silently accept package defaults (no Y/N prompt)
-  DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt install -y \
-    -o Dpkg::Options::="--force-confdef" \
-    -o Dpkg::Options::="--force-confold" \
-    mariadb-server mariadb-client
+  # DEBIAN_FRONTEND=noninteractive and NEEDRESTART_MODE=a are exported in
+  # parts/00_settings; APT_CONF_OPTS adds --force-confdef/--force-confold so
+  # any config-file conflict silently keeps the existing local copy (no Y/N
+  # prompt).
+  apt install -y "${APT_CONF_OPTS[@]}" mariadb-server mariadb-client
 
   logline "09.02 enable and start"
   systemctl enable mariadb
