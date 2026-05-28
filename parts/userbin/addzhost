@@ -340,10 +340,13 @@ echo "Created $WWWSITE ZDD structure. Now pulling initial release"
 if $WWWSITE/puller $TAG ; then
 	echo "Successful pull. Lets continue"
 else
+	echo ""
+	echo "#########################################################################################"
 	echo "The pull was not succesfull. Options: "
 	echo "R) Rollback - remove directory $WWWSITE and exit - so you can try again"
 	echo "S) Stop - just exit."
 	echo "C) Continue - create NGINX site info"
+	echo "Enter r/S/c ->"
 	read rollback
 	case "$rollback" in
 		R)
