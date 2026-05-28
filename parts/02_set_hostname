@@ -54,7 +54,12 @@ echo -n "MYSQL (MARIADB) is optional. Install mariadb [Y/n]=>" && read domysql
 # Currently consumed by parts/11_laravel (creates the laravel demo DB) but is
 # handy to have set for any later mysql work in the same session.
 if [ ! "$domysql" = "n" ]; then
-	echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
+	# Loop until a non-empty password is given - mariadb-secure-installation
+	# step (and the laravel demo DB create) both rely on a real password.
+	mysqlpwd=""
+	while [ -z "$mysqlpwd" ]; do
+		echo -n "Enter your mysql (mariadb) root password (cannot be empty) =>" && read mysqlpwd
+	done
 fi
 
 # Redis (consumed by parts/12_redis)

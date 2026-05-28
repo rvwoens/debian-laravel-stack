@@ -38,7 +38,12 @@ if [ ! "$domysql" = "n" ]; then
   # If $mysqlpwd was not collected (e.g. running this part standalone without
   # going through step 02), fall back to prompting now.
   if [ -z "${mysqlpwd+set}" ]; then
-    echo -n "Enter a new mysql (mariadb) root password =>" && read mysqlpwd
+    # Loop until a non-empty password is given - we are about to set this as
+    # the real mariadb root password, so an empty value is not acceptable.
+    mysqlpwd=""
+    while [ -z "$mysqlpwd" ]; do
+      echo -n "Enter a new mysql (mariadb) root password (cannot be empty) =>" && read mysqlpwd
+    done
   fi
 
   # Use a HEREDOC piped into mariadb. Note the SQL escaping of the underscore

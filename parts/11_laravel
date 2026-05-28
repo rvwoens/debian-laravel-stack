@@ -41,7 +41,13 @@ UEOF
 	# unattended. Fall back to prompting here when the script is executed standalone.
 	# Use ${var+set} so a deliberately empty password is NOT re-prompted.
 	if [ -z "${mysqlpwd+set}" ]; then
-		echo -n "Enter your mysql (mariadb) root password =>" && read mysqlpwd
+		# Loop until a non-empty password is given - we use it both to log
+		# into mariadb and as the DB_PASSWORD in the generated .env, so an
+		# empty value would silently break the laravel demo.
+		mysqlpwd=""
+		while [ -z "$mysqlpwd" ]; do
+			echo -n "Enter your mysql (mariadb) root password (cannot be empty) =>" && read mysqlpwd
+		done
 	fi
 	mysql -u root -p$mysqlpwd -e "CREATE DATABASE laravel;"
 
