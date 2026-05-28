@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-2.0.11-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-2.0.12-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -21,6 +21,7 @@
 * Nvm, Node, npm, yarn, pnpm
 * MariaDB
 * Redis
+* Fortune and cowsay, for a bit of retro fun
 * Tools to add (multiple) Laravel projects (any Laravel version) with fast Zero-Downtime deployment
 
 The scripts are all bash, and kept very simple so you can tweak them to your needs if you want to. 
@@ -42,8 +43,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.11.tar.gz | tar -xz
-cd debian-laravel-stack-2.0.11
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.12.tar.gz | tar -xz
+cd debian-laravel-stack-2.0.12
 ./setup_full
 ```
 
