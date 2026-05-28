@@ -106,76 +106,41 @@ fail2ban-client status
 fail2ban-client status sshd
 
 # --------------------------------------------------------------------------
-logline "05.04 CrowdSec - community-driven IPS (complements fail2ban)"
+# 05.04 CrowdSec - DISABLED (May 2026)
 # --------------------------------------------------------------------------
-# CrowdSec = log parser + decision engine. The "bouncer" is the thing that
-# actually blocks (we prefer the nftables bouncer, which is the modern default
-# on Debian 12+ and coexists with ufw without conflict).
+# Why disabled:
+#   - Debian's own crowdsec package is stuck on v1.4.6 (Aug 2022), three
+#     years behind upstream, and incompatible with the current Hub format,
+#     so `apt install crowdsec` from main is effectively dead.
+#   - The upstream packagecloud repo (via https://install.crowdsec.net)
+#     keeps breaking on Debian 13 (Trixie): the security engine installs
+#     fine, but `crowdsec-firewall-bouncer-nftables` cannot be located in
+#     the repo. Without a bouncer, crowdsec only DETECTS attacks, nothing
+#     blocks them - which makes the whole exercise pointless.
+#   - There is an open upstream issue about Trixie packaging since Sep 2025
+#     with no ETA. We're not the only ones hitting this.
 #
-# Both crowdsec and fail2ban can run side by side; they ban via different
-# tables/chains. CrowdSec also pulls a community blocklist daily, so you
-# benefit from IPs already flagged by other CrowdSec users worldwide.
-
-# Use CrowdSec's OFFICIAL install script (https://install.crowdsec.net)
-# instead of the raw packagecloud script. It handles apt-version differences
-# (signed-by needs apt >= 1.1), GPG key import, and does an apt update for
-# us. The packagecloud-only script has known issues on Debian 13 where the
-# bouncer package then fails to resolve.
-curl -fsSL https://install.crowdsec.net | DEBIAN_FRONTEND=noninteractive bash
-
-# Belt-and-braces apt update (the script does one internally, but on some
-# Debian 13 systems the cache can still appear stale right after).
-DEBIAN_FRONTEND=noninteractive apt update
-
-# 1) Install the security engine first. This is the only mandatory piece - if
-#    this fails the rest of the step would be pointless.
-DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt install -y \
-	-o Dpkg::Options::="--force-confdef" \
-	-o Dpkg::Options::="--force-confold" \
-	crowdsec
-
-# 2) Install a firewall bouncer separately, with graceful fallbacks:
-#       nftables (preferred, Debian 12+) -> iptables -> skip with a warning.
-#    Using `apt-cache show ... >/dev/null` instead of just trying the install
-#    means we get a clean message instead of an `apt install` error.
-if apt-cache show crowdsec-firewall-bouncer-nftables >/dev/null 2>&1; then
-	DEBIAN_FRONTEND=noninteractive apt install -y crowdsec-firewall-bouncer-nftables
-	CS_BOUNCER_UNIT=crowdsec-firewall-bouncer
-elif apt-cache show crowdsec-firewall-bouncer-iptables >/dev/null 2>&1; then
-	echo "!! crowdsec-firewall-bouncer-nftables not available, falling back to iptables bouncer"
-	DEBIAN_FRONTEND=noninteractive apt install -y crowdsec-firewall-bouncer-iptables
-	CS_BOUNCER_UNIT=crowdsec-firewall-bouncer
-else
-	echo "!! no crowdsec firewall bouncer available in apt - the crowdsec daemon will"
-	echo "!! still detect attacks, but nothing will block them automatically. Try:"
-	echo "!!   apt-cache search crowdsec-firewall-bouncer"
-	echo "!!   apt install crowdsec-firewall-bouncer-nftables"
-	CS_BOUNCER_UNIT=""
-fi
-
-# 3) Enable + start services. Guard each unit so a partial install doesn't
-#    abort the whole setup_full run.
-if systemctl list-unit-files crowdsec.service >/dev/null 2>&1; then
-	systemctl enable --now crowdsec
-fi
-if [ -n "$CS_BOUNCER_UNIT" ] && systemctl list-unit-files "${CS_BOUNCER_UNIT}.service" >/dev/null 2>&1; then
-	systemctl enable --now "$CS_BOUNCER_UNIT"
-fi
-
-# 4) Sanity overview. Parsers/scenarios for sshd ship by default, and the
-#    community blocklist starts populating within minutes. Guard cscli so the
-#    step doesn't error if the daemon install was skipped/failed.
-if command -v cscli >/dev/null 2>&1; then
-	cscli metrics || true
-	cscli decisions list || true
-fi
-
-# Optional manual follow-up (not required for protection to work):
-#   - Enroll this machine in the web console for a dashboard:
-#       cscli console enroll <YOUR_KEY>          # get key at https://app.crowdsec.net
-#   - Add extra collections (e.g. for nginx) once you have a site live:
-#       cscli collections install crowdsecurity/nginx
-#       systemctl reload crowdsec
+# What we use instead:
+#   - fail2ban (step 05.03 above) handles per-IP brute-force banning.
+#   - sshd is password-auth disabled (step 05.01), so SSH brute force is
+#     impossible regardless of fail2ban / crowdsec.
+#   - ufw default-deny incoming (step 05.02) covers the perimeter.
+#
+# When to re-enable (paste the block back from git history):
+#   1. Upstream confirms that crowdsec-firewall-bouncer-nftables is in the
+#      packagecloud "any/any" repo for Debian 13 / 14
+#      ( https://discourse.crowdsec.net thread "Debian Package crowdsec-
+#      firewall-bouncer-nftables cannot be found" - currently OPEN )
+#   2. Or CrowdSec ships their own apt repo (not packagecloud) - the
+#      install.crowdsec.net wrapper-around-a-wrapper is fragile.
+#   3. Verify with on a fresh Trixie box:
+#         curl -s https://install.crowdsec.net | sudo bash
+#         apt-cache show crowdsec-firewall-bouncer-nftables   # must succeed
+#         apt install -y crowdsec crowdsec-firewall-bouncer-nftables
+#
+# The full previous implementation lives in git history if you want to
+# restore it (look for "05.04 CrowdSec" before this commit).
+# --------------------------------------------------------------------------
 
 logline "05.99 security END"
 
