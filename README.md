@@ -1,5 +1,5 @@
 # Simple Debian Laravel stack for Zero-Downtime deployment
-[![GitHub Release](https://img.shields.io/badge/release-2.0.13-blue)](https://github.com/rvwoens/Debian-laravel-stack)
+[![GitHub Release](https://img.shields.io/badge/release-2.0.14-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Last commit](https://img.shields.io/github/last-commit/rvwoens/debian-laravel-stack)](https://github.com/rvwoens/Debian-laravel-stack)
 [![License](https://poser.pugx.org/cosninix/cos/license)](https://github.com/rvwoens/Debian-laravel-stack)
 
@@ -11,7 +11,7 @@
 [![Redis version](https://img.shields.io/badge/Redis-6.x%207.x%208.x-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 [![Laravel version](https://img.shields.io/badge/Laravel-v5%20v6%20v7%20v8%20v9%20v10%20v11%20v12-blue)](https://github.com/rvwoens/Debian-laravel-stack)
 * Install standard Debian packages and latest upgrades / updates
-* Security and Hardening (fail2ban, firewall, strict sshd)
+* Security and Hardening (fail2ban, firewall, strict sshd, automatic security updates with optional scheduled reboot)
 * create a standard user with sudo
 * gitlab and github tools
 
@@ -43,8 +43,8 @@ Multiple servers per project support (production, staging..) through a local ```
 * ssh as root and run:
 
 ```bash
-curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.13.tar.gz | tar -xz
-cd debian-laravel-stack-2.0.13
+curl -s -L https://github.com/rvwoens/debian-laravel-stack/archive/v2.0.14.tar.gz | tar -xz
+cd debian-laravel-stack-2.0.14
 ./setup_full
 ```
 
@@ -219,6 +219,9 @@ secures the root user
 
 #### 05 security
 firewalls, sshd security and fail2ban - disable password logins and secure it further with ```fail2ban```
+
+* optionally turns on automatic security updates (```unattended-upgrades```, Debian and Debian-Security packages only)
+* asks for a reboot time (HH:MM, server time zone) for updates that need a reboot, such as a new kernel. Leave it empty and the server never reboots by itself
 
 #### 06 global settings
 color prompts, timezone settings, ntp server, fortune and cowsay (just for fun)

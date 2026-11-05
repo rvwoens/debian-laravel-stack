@@ -142,5 +142,83 @@ fail2ban-client status sshd
 # restore it (look for "05.04 CrowdSec" before this commit).
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# 05.05 automatic updates + optional automatic reboot (unattended-upgrades)
+# --------------------------------------------------------------------------
+# Same configuration that ~/local/fleet-autoupdate applies to existing servers:
+#   20auto-upgrades     daily package-list refresh + daily unattended upgrade
+#   refresh-lists.conf  apt-get update right before each upgrade run, so a
+#                       security update published overnight is not missed
+#                       because of stale lists
+#   52auto-reboot       reboot at $reboottime when an update needs it (e.g. a
+#                       new kernel), or automatic reboots explicitly off
+#
+# Debian's default 50unattended-upgrades is left alone. It only installs
+# updates from the Debian and Debian-Security origins, so the Sury PHP,
+# NodeSource and GitHub CLI repos are NOT upgraded automatically.
+#
+# Timing: the upgrade runs from apt-daily-upgrade.timer (around 06:00-07:00).
+# When it needs a reboot it schedules one for the next $reboottime, which can
+# be the next night. The time is local server time, so the time zone set
+# later in parts/06_global_settings applies.
+# --------------------------------------------------------------------------
+logline "05.05 automatic updates (unattended-upgrades)"
+
+# $doautoupdate and $reboottime are normally pre-asked in parts/02_set_hostname
+# so this part can run unattended. Fall back to prompting here when the script
+# is executed standalone.
+# Use ${var+set} so a deliberate empty answer (= default) is NOT re-prompted.
+if [ -z "${doautoupdate+set}" ]; then
+	echo -n "Automatic security updates (unattended-upgrades) [Y/n]=>" && read doautoupdate
+fi
+if [ "$doautoupdate" = "n" ] || [ "$doautoupdate" = "N" ]; then
+	echo "Skipping automatic updates - installing security updates is up to you."
+else
+	# time zone the reboot time will be read in (only used for messages)
+	if [ -n "${timezone+set}" ]; then
+		reboottz=${timezone:-UTC}
+	else
+		reboottz=$(timedatectl show -p Timezone --value)
+	fi
+	# ask when never asked, or when a value from the environment is not HH:MM
+	if [ -z "${reboottime+set}" ] || ! valid_reboottime "$reboottime"; then
+		ask_reboottime "$reboottz"
+	fi
+
+	apt install -y unattended-upgrades
+
+	cat <<-'EOF' >/etc/apt/apt.conf.d/20auto-upgrades
+		APT::Periodic::Update-Package-Lists "1";
+		APT::Periodic::Unattended-Upgrade "1";
+	EOF
+
+	mkdir -p /etc/systemd/system/apt-daily-upgrade.service.d
+	cat <<-'EOF' >/etc/systemd/system/apt-daily-upgrade.service.d/refresh-lists.conf
+		[Service]
+		ExecStartPre=/usr/bin/apt-get -qq update
+	EOF
+	systemctl daemon-reload
+
+	if [ -n "$reboottime" ]; then
+		# unquoted EOF: $reboottime is filled in
+		cat <<-EOF >/etc/apt/apt.conf.d/52auto-reboot
+			Unattended-Upgrade::Automatic-Reboot "true";
+			Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+			Unattended-Upgrade::Automatic-Reboot-Time "$reboottime";
+		EOF
+		echo "Automatic updates ON - reboots when needed at $reboottime ($reboottz)"
+	else
+		cat <<-'EOF' >/etc/apt/apt.conf.d/52auto-reboot
+			Unattended-Upgrade::Automatic-Reboot "false";
+		EOF
+		echo "Automatic updates ON - automatic reboots OFF"
+	fi
+
+	# show what unattended-upgrades will actually use
+	echo "---- effective unattended-upgrades settings ----"
+	apt-config dump | grep -E '^(APT::Periodic::(Update-Package-Lists|Unattended-Upgrade)|Unattended-Upgrade::Automatic-Reboot)'
+	echo "------------------------------------------------"
+fi
+
 logline "05.99 security END"
 

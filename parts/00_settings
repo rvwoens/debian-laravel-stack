@@ -40,3 +40,21 @@ export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 APT_CONF_OPTS=(-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
 
+# --------------------------------------------------------------------------
+# Automatic reboot time for unattended-upgrades (parts/02 asks, parts/05 uses)
+#   valid_reboottime <value> -> true for empty (= no automatic reboots) or a
+#                               24h time HH:MM (00:00-23:59)
+#   ask_reboottime <tz>      -> prompts until valid, sets $reboottime.
+#                               <tz> is only shown in the prompt.
+# --------------------------------------------------------------------------
+valid_reboottime () {
+	[ -z "$1" ] || [[ "$1" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]
+}
+ask_reboottime () {
+	while true; do
+		echo -n "  Reboot automatically when an update needs it? Enter time HH:MM ($1), or enter for never =>" && read reboottime
+		valid_reboottime "$reboottime" && break
+		echo "  !! \"$reboottime\" is not a valid time - use HH:MM between 00:00 and 23:59 (e.g. 04:00)"
+	done
+}
+

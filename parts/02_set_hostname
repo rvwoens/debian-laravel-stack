@@ -21,7 +21,7 @@ EOF
 # --------------------------------------------------------------------------
 # Gather all "downstream" questions up front so the rest of the install
 # runs unattended. setup_full sources each part with `.` so the variables
-# set here stay alive across parts 04, 06, 08, 09, 11 and 12.
+# set here stay alive across parts 04, 05, 06, 08, 09, 11 and 12.
 #
 # Each consuming part has a `[ -z "$VAR" ]` guard so it can still be run
 # standalone (bash ./parts/NN_xxx) and will prompt then.
@@ -41,6 +41,14 @@ echo -n "Do you want a long secure root password (l) or no password at all (n) [
 
 # Timezone (consumed by parts/06_global_settings) - blank = UTC
 echo -n "What timezone do you want (enter for UTC) =>" && read timezone
+
+# Automatic security updates + optional reboot time (consumed by parts/05_security).
+# Asked after the timezone because the reboot time is in that time zone.
+# Empty reboot time = updates are installed, but the server never reboots by itself.
+echo -n "Automatic security updates (unattended-upgrades) [Y/n]=>" && read doautoupdate
+if [ "$doautoupdate" != "n" ] && [ "$doautoupdate" != "N" ]; then
+	ask_reboottime "${timezone:-UTC}"
+fi
 
 # Fortune + cowsay banner in the user's .bashrc (consumed by parts/06_global_settings)
 echo -n "Install fortune+cowsay banner on login (just for fun) [Y/n]=>" && read docowsay
